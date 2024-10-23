@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable, select
 from sqlalchemy.sql.expression import text
 
+
 class Runner:
     def __init__(self) -> None:
         registry.register("bigquery", "sqlalchemy_bigquery", "BigQueryDialect")
@@ -23,9 +24,9 @@ class Runner:
         )
         return table
 
-    def select(self, stmt: Selectable) -> list[dict]:
+    def select(self, stmt: Selectable, params=None) -> list[dict]:
         with Session(self.engine) as session:
-            results: list[Row] = session.execute(stmt).fetchall()
+            results: list[Row] = session.execute(stmt, params).fetchall()
             return [r._asdict() for r in results]
 
 
@@ -57,26 +58,46 @@ class Runner:
 )
 @click.option(
     "--format",
-    type=str,
+    type=click.Choice(["json", "csv"]),
     help="output format",
     default="json",
 )
-def main(project: str, dataset: str, orderby: list[str], dryrun: bool, format: str):
+@click.option(
+    "--timezone",
+    type=str,
+    help="timezone",
+    default="Asia/Tokyo",
+)
+def main(
+    project: str,
+    dataset: str,
+    orderby: list[str],
+    dryrun: bool,
+    format: str,
+    timezone: str,
+):
     "bigquery meta data table utility"
     runner = Runner()
 
     table = runner.get_table(project, dataset, "__TABLES__")
-    derived_column = text("last_modified_time AS derived_column")
-    stmt = (
-        select(
-            # all column astarisk
-            # table.c.
-            table.c,
-            derived_column,
-        )
-        # .filter(
-        #    table.c.categoryID == 1,
-        # )
+    stmt = select(
+        table.c,
+        text(
+            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone) as creation_time_tz"
+        ),
+        text(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY) as days_since_creation"
+        ),
+        text(
+            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), :timezone) as last_modified_time_tz"
+        ),
+        text(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY) as days_since_last_modification"
+        ),
+        text("size_bytes / 1024 / 1024 / 1024 as size_gb"),
+        text(
+            "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END AS table_type"
+        ),
     )
     if orderby:
         for c in orderby:
@@ -90,7 +111,7 @@ def main(project: str, dataset: str, orderby: list[str], dryrun: bool, format: s
         print(stmt)
 
     else:
-        res = runner.select(stmt)
+        res = runner.select(stmt, {"timezone": timezone})
 
         # print as json
         if format == "json":
