@@ -5,7 +5,7 @@ from sqlalchemy.dialects import registry
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable, select
-
+from sqlalchemy.sql.expression import text
 
 class Runner:
     def __init__(self) -> None:
@@ -66,11 +66,13 @@ def main(project: str, dataset: str, orderby: list[str], dryrun: bool, format: s
     runner = Runner()
 
     table = runner.get_table(project, dataset, "__TABLES__")
+    derived_column = text("last_modified_time AS derived_column")
     stmt = (
         select(
             # all column astarisk
             # table.c.
-            table.c
+            table.c,
+            derived_column,
         )
         # .filter(
         #    table.c.categoryID == 1,
