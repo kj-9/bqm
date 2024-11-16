@@ -37,7 +37,7 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  command  Command description goes here
+  tables  bigquery meta data table utility
 
 ```
 <!-- [[[end]]] -->
