@@ -1,5 +1,4 @@
 import click
-
 from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.dialects import registry
 from sqlalchemy.engine.row import Row
@@ -35,7 +34,8 @@ class Runner:
 def cli():
     "Bigquery meta data table utility"
 
-@click.command()
+
+@cli.command("tables")
 @click.option(
     "-p",
     "--project",
@@ -73,7 +73,7 @@ def cli():
     help="timezone",
     default="Asia/Tokyo",
 )
-def main(
+def main(  # noqa: PLR0913
     project: str,
     dataset: str,
     orderby: list[str],
@@ -132,4 +132,3 @@ def main(
             writer.writerows(res)
         else:
             print(res)
-
