@@ -1,12 +1,52 @@
 [project]
 name = "bqm"
-description = "bigquery meta data table utility"
-version = "0.1.0"
+version = "0.1"
+description = "Bigquery meta data table utility"
+readme = "README.md"
+authors = [{name = "kj"}]
+license = {text = "Apache-2.0"}
 requires-python = ">=3.9"
+classifiers = [
+    "License :: OSI Approved :: Apache Software License"
+]
 dependencies = [
     "click",
-    "sqlalchemy-bigquery>=1.12.0",
+    "sqlalchemy-bigquery>=1.12.0"
 ]
 
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project.urls]
+Homepage = "https://github.com/kj-9/bqm"
+Changelog = "https://github.com/kj-9/bqm/releases"
+Issues = "https://github.com/kj-9/bqm/issues"
+CI = "https://github.com/kj-9/bqm/actions"
+
 [project.scripts]
-bqm= "main:main"
+bqm = "bqm.cli:cli"
+
+[project.optional-dependencies]
+test = ["pytest", "pre-commit", "cogapp"]
+
+# see also: https://beta.ruff.rs/docs/configuration/#using-pyprojecttoml
+[tool.ruff]
+select = [
+    "E", "F", "I",
+    #"D", for now
+    "W", "PL", "B", "UP"
+]
+
+# Never enforce `E501` (line length violations).
+ignore = [
+    "E501",
+    "PLR2004"# for now
+]
+
+# Ignore `E402` (import violations) in all `__init__.py` files, and in `path/to/file.py`.
+[tool.ruff.per-file-ignores]
+"*__init__.py" = ["F401"]
+
+[tool.ruff.pydocstyle]
+convention = "google"

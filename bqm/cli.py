@@ -30,6 +30,11 @@ class Runner:
             return [r._asdict() for r in results]
 
 
+@click.group()
+@click.version_option()
+def cli():
+    "Bigquery meta data table utility"
+
 @click.command()
 @click.option(
     "-p",
@@ -128,6 +133,3 @@ def main(
         else:
             print(res)
 
-
-if __name__ == "__main__":
-    main()
