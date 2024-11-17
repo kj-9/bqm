@@ -3,7 +3,8 @@ from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.dialects import registry
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import Selectable, select
+from sqlalchemy.sql import Selectable
+from sqlalchemy.sql import select as sgla_select
 from sqlalchemy.sql.expression import text
 
 
@@ -49,6 +50,12 @@ def cli():
     help="dataset name",
 )
 @click.option(
+    "-s",
+    "--select",
+    type=str,
+    help="commna separated column names",
+)
+@click.option(
     # order by column
     "-o",
     "--orderby",
@@ -76,6 +83,7 @@ def cli():
 def tables(  # noqa: PLR0913
     project: str,
     dataset: str,
+    select: str,
     orderby: list[str],
     dryrun: bool,
     format: str,
@@ -85,7 +93,7 @@ def tables(  # noqa: PLR0913
     runner = Runner()
 
     table = runner.get_table(project, dataset, "__TABLES__")
-    stmt = select(
+    stmt = sgla_select(
         table.c,
         text(
             "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone) as creation_time_tz"
@@ -104,6 +112,11 @@ def tables(  # noqa: PLR0913
             "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END AS table_type"
         ),
     )
+    # select columns
+    if select:
+        selects = select.split(",")
+        stmt = stmt.with_only_columns(*[table.c[c] for c in selects])
+
     if orderby:
         for c in orderby:
             # get if last 4 char is 'desc' with case not sensitive
