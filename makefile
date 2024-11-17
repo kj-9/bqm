@@ -21,3 +21,10 @@ check:
 .PHONY: test
 test:
 	python -m pytest
+
+.PHONY: test-all
+test-all:
+ifndef project
+	$(error project is not set)
+endif
+	python -m pytest --integration --project $(project)

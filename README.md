@@ -58,10 +58,17 @@ Now install the dependencies and test dependencies:
 ```bash
 make install-e
 ```
-To run the tests:
+To run the unit tests:
 ```bash
 make test
 ```
+
+Integration tests are skipped by default. To run all tests:
+```bash
+make test-all project=<project_id>
+```
+where `<project_id>` is the GCP project id where the tests will be run.
+
 
 To run pre-commit to lint and format:
 ```bash
