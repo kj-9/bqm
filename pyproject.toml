@@ -5,7 +5,7 @@ description = "Bigquery meta data table utility"
 readme = "README.md"
 authors = [{name = "kj"}]
 license = {text = "Apache-2.0"}
-requires-python = ">=3.9"
+requires-python = ">=3.9, <3.13" # sqlalchemy-bigquery==1.12.0 does not support Python 3.13 yet
 classifiers = [
     "License :: OSI Approved :: Apache Software License"
 ]
