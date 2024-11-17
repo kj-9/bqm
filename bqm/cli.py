@@ -126,7 +126,7 @@ def tables(  # noqa: PLR0913
                 stmt = stmt.order_by(table.c[c])
 
     if dryrun:
-        print(stmt)
+        click.echo(stmt)
 
     else:
         res = runner.select(stmt, {"timezone": timezone})
@@ -135,7 +135,7 @@ def tables(  # noqa: PLR0913
         if format == "json":
             import json
 
-            print(json.dumps(res, indent=2))
+            click.echo(json.dumps(res, indent=2))
         elif format == "csv":
             import csv
             import sys
@@ -143,5 +143,3 @@ def tables(  # noqa: PLR0913
             writer = csv.DictWriter(sys.stdout, fieldnames=res[0].keys())
             writer.writeheader()
             writer.writerows(res)
-        else:
-            print(res)
