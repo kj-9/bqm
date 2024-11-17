@@ -73,7 +73,7 @@ def cli():
     help="timezone",
     default="Asia/Tokyo",
 )
-def main(  # noqa: PLR0913
+def tables(  # noqa: PLR0913
     project: str,
     dataset: str,
     orderby: list[str],
