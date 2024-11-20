@@ -27,9 +27,9 @@ def test_selects(snapshot):
                 "--select",
                 "TABLE_SCHeMA,view_definition",
                 "--orderby",
-                "table_scheMa",
+                "table_scheMa dEsc",
                 "-o",
-                "table_catalog",
+                "table_catalog aSC",
                 "--dryrun",
             ],
         )

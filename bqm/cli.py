@@ -122,8 +122,11 @@ def add_selects(stmt, selects, table):
 def add_orderby(stmt, orderbys, table):
     for c in orderbys:
         # get if last 4 char is 'desc' with case not sensitive
-        if c[-4:].lower() == "desc":
+        if c[-5:].lower() == " desc":
             stmt = stmt.order_by(table.c[c[:-4].strip()].desc())
+
+        elif c[-4:].lower() == " asc":
+            stmt = stmt.order_by(table.c[c[:-3].strip()])
         else:
             stmt = stmt.order_by(table.c[c])
     return stmt
