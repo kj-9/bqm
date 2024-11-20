@@ -1,3 +1,5 @@
+from functools import wraps
+
 import click
 from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.dialects import registry
@@ -16,11 +18,17 @@ class Runner:
         )
         self.metadata = MetaData()
 
-    def get_table(self, project_name: str, dataset_name: str, table_name: str) -> Table:
+    def get_table(
+        self,
+        project_name: str,
+        dataset_name: str,
+        table_name: str,
+        auto_load: bool = True,
+    ) -> Table:
         table = Table(
             f"{project_name}.{dataset_name}.{table_name}",
             self.metadata,
-            autoload_with=self.engine,
+            autoload_with=self.engine if auto_load else None,
         )
         return table
 
@@ -36,50 +44,93 @@ def cli():
     "Bigquery meta data table utility"
 
 
+def query_options(f):
+    @click.option(
+        "-p",
+        "--project",
+        type=str,
+        help="project name",
+    )
+    @click.option(
+        "-d",
+        "--dataset",
+        type=str,
+        help="dataset name",
+    )
+    @click.option(
+        "-s",
+        "--select",
+        type=str,
+        help="commna separated column names",
+    )
+    @click.option(
+        # order by column
+        "-o",
+        "--orderby",
+        type=str,
+        multiple=True,
+        help="order by columns, if 'column_name desc' to sort descending",
+    )
+    @click.option(
+        "--dryrun",
+        is_flag=True,
+        help="dry run mode, only show the rendered command",
+    )
+    @click.option(
+        "--format",
+        type=click.Choice(["json", "csv"]),
+        help="output format",
+        default="json",
+    )
+    @click.option(
+        "--timezone",
+        type=str,
+        help="timezone",
+        default="Asia/Tokyo",
+    )
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        return f(*args, **kwargs)
+
+    return wrapper
+
+
+def output_result(res, format):
+    if not res:
+        click.echo("No data returned.", err=True)
+        return
+
+    if format == "json":
+        import json
+
+        click.echo(json.dumps(res, indent=2))
+    elif format == "csv":
+        import csv
+        import sys
+
+        writer = csv.DictWriter(sys.stdout, fieldnames=res[0].keys())
+        writer.writeheader()
+        writer.writerows(res)
+
+
+def add_selects(stmt, selects, table):
+    if selects:
+        stmt = stmt.with_only_columns(*[table.c[c] for c in selects])
+    return stmt
+
+
+def add_orderby(stmt, orderbys, table):
+    for c in orderbys:
+        # get if last 4 char is 'desc' with case not sensitive
+        if c[-4:].lower() == "desc":
+            stmt = stmt.order_by(table.c[c[:-4].strip()].desc())
+        else:
+            stmt = stmt.order_by(table.c[c])
+    return stmt
+
+
 @cli.command("tables")
-@click.option(
-    "-p",
-    "--project",
-    type=str,
-    help="project name",
-)
-@click.option(
-    "-d",
-    "--dataset",
-    type=str,
-    help="dataset name",
-)
-@click.option(
-    "-s",
-    "--select",
-    type=str,
-    help="commna separated column names",
-)
-@click.option(
-    # order by column
-    "-o",
-    "--orderby",
-    type=str,
-    multiple=True,
-    help="order by columns, if 'column_name desc' to sort descending",
-)
-@click.option(
-    "--dryrun",
-    is_flag=True,
-    help="dry run mode, only show the rendered command",
-)
-@click.option(
-    "--format",
-    type=click.Choice(["json", "csv"]),
-    help="output format",
-    default="json",
-)
-@click.option(
-    "--timezone",
-    type=str,
-    help="timezone",
-    default="Asia/Tokyo",
-)
+@query_options
 def tables(  # noqa: PLR0913
     project: str,
     dataset: str,
@@ -89,7 +140,7 @@ def tables(  # noqa: PLR0913
     format: str,
     timezone: str,
 ):
-    "bigquery meta data table utility"
+    """query __TABLES__"""
     runner = Runner()
 
     table = runner.get_table(project, dataset, "__TABLES__")
@@ -113,17 +164,10 @@ def tables(  # noqa: PLR0913
         ),
     )
     # select columns
-    if select:
-        selects = select.split(",")
-        stmt = stmt.with_only_columns(*[table.c[c] for c in selects])
-
-    if orderby:
-        for c in orderby:
-            # get if last 4 char is 'desc' with case not sensitive
-            if c[-4:].lower() == "desc":
-                stmt = stmt.order_by(table.c[c[:-4].strip()].desc())
-            else:
-                stmt = stmt.order_by(table.c[c])
+    selects = select.split(",") if select else None
+    stmt = add_selects(stmt, selects, table)
+    # order by columns
+    stmt = add_orderby(stmt, orderby, table)
 
     if dryrun:
         click.echo(stmt)
@@ -131,15 +175,68 @@ def tables(  # noqa: PLR0913
     else:
         res = runner.select(stmt, {"timezone": timezone})
 
-        # print as json
-        if format == "json":
-            import json
+        output_result(res, format)
 
-            click.echo(json.dumps(res, indent=2))
-        elif format == "csv":
-            import csv
-            import sys
 
-            writer = csv.DictWriter(sys.stdout, fieldnames=res[0].keys())
-            writer.writeheader()
-            writer.writerows(res)
+@cli.command("views")
+@query_options
+def views(  # noqa: PLR0913
+    project: str,
+    dataset: str,
+    select: str,
+    orderby: list[str],
+    dryrun: bool,
+    format: str,
+    timezone: str,
+):
+    """query INFORMATION_SCHEMA.VIEWS"""
+
+    runner = Runner()
+
+    # auto_load=False to avoid error
+    # sqlalchemy-bigquery does not allow to auto_load full table name which contains 3 parts (dots)
+    # like `project.dataset.INFORMATION_SCHEMA.VIEWS`
+    table = runner.get_table(
+        project, dataset, "INFORMATION_SCHEMA.VIEWS", auto_load=False
+    )
+
+    # add columns
+    from sqlalchemy import Column, String
+
+    """INFORMATION_SCHEMA.VIEWS
+    ref: https://cloud.google.com/bigquery/docs/information-schema-views#schema
+
+    columns:
+    TABLE_CATALOG	STRING	The name of the project that contains the dataset
+    TABLE_SCHEMA	STRING	The name of the dataset that contains the view also referred to as the dataset id
+    TABLE_NAME	STRING	The name of the view also referred to as the table id
+    VIEW_DEFINITION	STRING	The SQL query that defines the view
+    CHECK_OPTION	STRING	The value returned is always NULL
+    USE_STANDARD_SQL	STRING	YES if the view was created by using a GoogleSQL query; NO if useLegacySql is set to true
+    """
+
+    columns = [
+        Column("TABLE_CATALOG", String),
+        Column("TABLE_SCHEMA", String),
+        Column("TABLE_NAME", String),
+        Column("VIEW_DEFINITION", String),
+        Column("CHECK_OPTION", String),
+        Column("USE_STANDARD_SQL", String),
+    ]
+
+    for c in columns:
+        table.append_column(c)
+
+    stmt = sgla_select(table.c)
+
+    selects = select.split(",") if select else None
+    stmt = add_selects(stmt, selects, table)
+    stmt = add_orderby(stmt, orderby, table)
+
+    if dryrun:
+        click.echo(stmt)
+
+    else:
+        res = runner.select(stmt, {"timezone": timezone})
+
+        output_result(res, format)
