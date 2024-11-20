@@ -28,7 +28,7 @@ CI = "https://github.com/kj-9/bqm/actions"
 bqm = "bqm.cli:cli"
 
 [project.optional-dependencies]
-test = ["pytest", "pre-commit", "cogapp"]
+test = ["pytest", "pre-commit", "cogapp", "syrupy"]
 
 # see also: https://beta.ruff.rs/docs/configuration/#using-pyprojecttoml
 [tool.ruff.lint]

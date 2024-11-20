@@ -143,6 +143,8 @@ def tables(  # noqa: PLR0913
     """query __TABLES__"""
     runner = Runner()
 
+    # TODO: may be I should define the table schema in the code not using auto_load
+    # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
     table = runner.get_table(project, dataset, "__TABLES__")
     stmt = sgla_select(
         table.c,
@@ -215,6 +217,8 @@ def views(  # noqa: PLR0913
     USE_STANDARD_SQL	STRING	YES if the view was created by using a GoogleSQL query; NO if useLegacySql is set to true
     """
 
+    # These columns are case sensitive in sqlalchemy but bq's columns are.
+    # Use uppercase to algin bigquery's column names in their document
     columns = [
         Column("TABLE_CATALOG", String),
         Column("TABLE_SCHEMA", String),
@@ -229,8 +233,10 @@ def views(  # noqa: PLR0913
 
     stmt = sgla_select(table.c)
 
-    selects = select.split(",") if select else None
+    # need to align upper case that is defined above
+    selects = select.upper().split(",") if select else None
     stmt = add_selects(stmt, selects, table)
+    orderby = [c.upper() for c in orderby]
     stmt = add_orderby(stmt, orderby, table)
 
     if dryrun:
