@@ -7,7 +7,6 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable
 from sqlalchemy.sql import select as sgla_select
-from sqlalchemy.sql.expression import text
 
 
 class Runner:
@@ -113,22 +112,22 @@ def output_result(res, format):
         writer.writerows(res)
 
 
-def add_selects(stmt, selects, table):
+def add_selects(stmt, selects):
     if selects:
-        stmt = stmt.with_only_columns(*[table.c[c] for c in selects])
+        stmt = stmt.with_only_columns(*[stmt.selected_columns[c] for c in selects])
     return stmt
 
 
-def add_orderby(stmt, orderbys, table):
+def add_orderby(stmt, stmt_all, orderbys):
     for c in orderbys:
         # get if last 4 char is 'desc' with case not sensitive
         if c[-5:].lower() == " desc":
-            stmt = stmt.order_by(table.c[c[:-4].strip()].desc())
+            stmt = stmt.order_by(stmt_all.selected_columns[c[:-4].strip()].desc())
 
         elif c[-4:].lower() == " asc":
-            stmt = stmt.order_by(table.c[c[:-3].strip()])
+            stmt = stmt.order_by(stmt_all.selected_columns[c[:-3].strip()])
         else:
-            stmt = stmt.order_by(table.c[c])
+            stmt = stmt.order_by(stmt_all.selected_columns[c])
     return stmt
 
 
@@ -145,34 +144,36 @@ def tables(  # noqa: PLR0913
 ):
     """query __TABLES__"""
     runner = Runner()
+    from sqlalchemy.sql.expression import literal_column
 
     # TODO: may be I should define the table schema in the code not using auto_load
     # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
     table = runner.get_table(project, dataset, "__TABLES__")
-    stmt = sgla_select(  # type: ignore[call-overload]
+    stmt_all = sgla_select(  # type: ignore[call-overload]
         table.c,
-        text(
-            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone) as creation_time_tz"
-        ),
-        text(
-            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY) as days_since_creation"
-        ),
-        text(
-            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), :timezone) as last_modified_time_tz"
-        ),
-        text(
-            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY) as days_since_last_modification"
-        ),
-        text("size_bytes / 1024 / 1024 / 1024 as size_gb"),
-        text(
-            "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END AS table_type"
-        ),
+        literal_column(
+            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone)"
+        ).label("creation_time_tz"),
+        literal_column(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY)"
+        ).label("days_since_creation"),
+        literal_column(
+            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), :timezone)"
+        ).label("last_modified_time_tz"),
+        literal_column(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY)"
+        ).label("days_since_last_modification"),
+        literal_column("size_bytes / 1024 / 1024 / 1024").label("size_gb"),
+        literal_column(
+            "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END"
+        ).label("table_type"),
     )
+
     # select columns
     selects = select.split(",") if select else None
-    stmt = add_selects(stmt, selects, table)
+    stmt = add_selects(stmt_all, selects)
     # order by columns
-    stmt = add_orderby(stmt, orderby, table)
+    stmt = add_orderby(stmt, stmt_all, orderby)
 
     if dryrun:
         click.echo(stmt)
@@ -234,13 +235,13 @@ def views(  # noqa: PLR0913
     for c in columns:
         table.append_column(c)
 
-    stmt = sgla_select(table.c)  # type: ignore[call-overload]
+    stmt_all = sgla_select(table.c)  # type: ignore[call-overload]
 
     # need to align upper case that is defined above
     selects = select.upper().split(",") if select else None
-    stmt = add_selects(stmt, selects, table)
+    stmt = add_selects(stmt_all, selects)
     orderby = [c.upper() for c in orderby]
-    stmt = add_orderby(stmt, orderby, table)
+    stmt = add_orderby(stmt, stmt_all, orderby)
 
     if dryrun:
         click.echo(stmt)

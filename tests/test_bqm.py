@@ -11,7 +11,34 @@ def test_version():
         assert result.output.startswith("cli, version ")
 
 
-def test_selects(snapshot):
+def test_tables(snapshot):
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        # need to mock the bq request when using auto_load
+        result = runner.invoke(
+            cli,
+            [
+                "tables",
+                "--project",
+                "project",
+                "--dataset",
+                "dataset",
+                "--select",
+                "creation_time_tz",
+                "--orderby",
+                "days_since_creation desc",
+                "-o",
+                "size_bytes asc",
+                "--dryrun",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert result.output == snapshot
+
+
+def test_views(snapshot):
     runner = CliRunner()
 
     with runner.isolated_filesystem():
