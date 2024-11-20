@@ -34,7 +34,7 @@ class Runner:
 
     def select(self, stmt: Selectable, params=None) -> list[dict]:
         with Session(self.engine) as session:
-            results: list[Row] = session.execute(stmt, params).fetchall()
+            results: list[Row] = session.execute(stmt, params).fetchall()  # type: ignore[call-overload]
             return [r._asdict() for r in results]
 
 
@@ -146,7 +146,7 @@ def tables(  # noqa: PLR0913
     # TODO: may be I should define the table schema in the code not using auto_load
     # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
     table = runner.get_table(project, dataset, "__TABLES__")
-    stmt = sgla_select(
+    stmt = sgla_select(  # type: ignore[call-overload]
         table.c,
         text(
             "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone) as creation_time_tz"
@@ -231,7 +231,7 @@ def views(  # noqa: PLR0913
     for c in columns:
         table.append_column(c)
 
-    stmt = sgla_select(table.c)
+    stmt = sgla_select(table.c)  # type: ignore[call-overload]
 
     # need to align upper case that is defined above
     selects = select.upper().split(",") if select else None
