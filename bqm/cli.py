@@ -114,7 +114,10 @@ def output_result(res, format):
 
 def add_selects(stmt, selects):
     if selects:
-        stmt = stmt.with_only_columns(*[stmt.selected_columns[c] for c in selects])
+        stmt = stmt.with_only_columns(
+            *[stmt.selected_columns[c] for c in selects],
+            maintain_column_froms=True,  # this keeps derived columns in sa_select using literal_column
+        )
     return stmt
 
 
