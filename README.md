@@ -37,7 +37,8 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  tables  bigquery meta data table utility
+  tables  query __TABLES__
+  views   query INFORMATION_SCHEMA.VIEWS
 
 ```
 <!-- [[[end]]] -->
