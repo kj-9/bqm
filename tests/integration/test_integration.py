@@ -84,7 +84,7 @@ def test_integration(bigquery_client, table):
     ]
 
 
-def test_tables(project, table, snapshot):
+def test_tables_dryrun(project, table, snapshot):
     runner = CliRunner()
 
     with runner.isolated_filesystem():
