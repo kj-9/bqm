@@ -82,3 +82,29 @@ def test_integration(bigquery_client, table):
         "size_gb",
         "table_type",
     ]
+
+
+def test_tables(project, table, snapshot):
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(
+            cli,
+            [
+                "tables",
+                "--project",
+                project,
+                "--dataset",
+                table.dataset_id,
+                "--select",
+                "creation_time_tz",
+                "--orderby",
+                "days_since_creation desc",
+                "-o",
+                "size_bytes asc",
+                "--dryrun",
+            ],
+        )
+
+        assert result.exit_code == 0  # need to mock the bq request when using auto_load
+        assert result.output == snapshot
