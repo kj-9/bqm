@@ -6,7 +6,7 @@ from sqlalchemy.dialects import registry
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable
-from sqlalchemy.sql import select as sgla_select
+from sqlalchemy.sql import select as sa_select
 
 
 class Runner:
@@ -152,7 +152,7 @@ def tables(  # noqa: PLR0913
     # TODO: may be I should define the table schema in the code not using auto_load
     # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
     table = runner.get_table(project, dataset, "__TABLES__")
-    stmt_all = sgla_select(  # type: ignore[call-overload]
+    stmt_all = sa_select(  # type: ignore[call-overload]
         table.c,
         literal_column(
             "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone)"
@@ -238,7 +238,7 @@ def views(  # noqa: PLR0913
     for c in columns:
         table.append_column(c)
 
-    stmt_all = sgla_select(table.c)  # type: ignore[call-overload]
+    stmt_all = sa_select(table.c)  # type: ignore[call-overload]
 
     # need to align upper case that is defined above
     selects = select.upper().split(",") if select else None
