@@ -1,6 +1,6 @@
 [project]
 name = "bqm"
-version = "0.1"
+version = "0.1a0"
 description = "Bigquery meta data table utility"
 readme = "README.md"
 authors = [{name = "kj"}]
