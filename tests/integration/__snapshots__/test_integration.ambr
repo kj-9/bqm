@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: test_tables
+# name: test_tables_dryrun
   '''
   SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone) AS creation_time_tz 
   FROM "kjh9-private-gcp.bqm_test_dataset.__TABLES__" ORDER BY TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY) DESC, "kjh9-private-gcp.bqm_test_dataset.__TABLES__".size_bytes

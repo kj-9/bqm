@@ -1,5 +1,5 @@
 # serializer version: 1
-# name: test_views
+# name: test_views_dryrun
   '''
   SELECT "project.dataset.INFORMATION_SCHEMA.VIEWS"."TABLE_SCHEMA", "project.dataset.INFORMATION_SCHEMA.VIEWS"."VIEW_DEFINITION" 
   FROM "project.dataset.INFORMATION_SCHEMA.VIEWS" ORDER BY "project.dataset.INFORMATION_SCHEMA.VIEWS"."TABLE_SCHEMA" DESC, "project.dataset.INFORMATION_SCHEMA.VIEWS"."TABLE_CATALOG"
