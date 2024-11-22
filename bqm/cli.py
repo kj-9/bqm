@@ -1,3 +1,4 @@
+import warnings
 from functools import wraps
 from zoneinfo import ZoneInfo
 
@@ -9,6 +10,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable
 from sqlalchemy.sql import select as sa_select
 from sqlalchemy.sql.expression import literal_column
+
+# Suppress the specific warning
+warnings.filterwarnings(
+    "ignore",
+    message="Cannot create BigQuery Storage client, the dependency google-cloud-bigquery-storage is not installed.",
+    category=UserWarning,
+    module="google.cloud.bigquery.client",
+)
 
 
 class Runner:
