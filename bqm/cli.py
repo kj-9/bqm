@@ -1,4 +1,5 @@
 from functools import wraps
+from zoneinfo import ZoneInfo
 
 import click
 from sqlalchemy import MetaData, Table, create_engine
@@ -7,6 +8,7 @@ from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable
 from sqlalchemy.sql import select as sa_select
+from sqlalchemy.sql.expression import literal_column
 
 
 class Runner:
@@ -35,6 +37,15 @@ class Runner:
         with Session(self.engine) as session:
             results: list[Row] = session.execute(stmt, params).fetchall()  # type: ignore[call-overload]
             return [r._asdict() for r in results]
+
+
+def validate_tz(tz: str) -> str:
+    try:
+        ZoneInfo(tz)
+    except Exception as e:
+        raise click.BadParameter(f"{tz} is not a valid timezone") from e
+
+    return tz
 
 
 @click.group()
@@ -147,7 +158,9 @@ def tables(  # noqa: PLR0913
 ):
     """query __TABLES__"""
     runner = Runner()
-    from sqlalchemy.sql.expression import literal_column
+
+    # sanitize timezone
+    timezone = validate_tz(timezone)
 
     # TODO: may be I should define the table schema in the code not using auto_load
     # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
@@ -155,13 +168,13 @@ def tables(  # noqa: PLR0913
     stmt_all = sa_select(  # type: ignore[call-overload]
         table.c,
         literal_column(
-            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), :timezone)"
+            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), '{timezone}')"
         ).label("creation_time_tz"),
         literal_column(
             "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY)"
         ).label("days_since_creation"),
         literal_column(
-            "FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), :timezone)"
+            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), '{timezone}')"
         ).label("last_modified_time_tz"),
         literal_column(
             "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY)"
