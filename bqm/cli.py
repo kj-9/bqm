@@ -152,7 +152,7 @@ def output_result(res, format):
 def add_selects(stmt, selects):
     if selects:
         stmt = stmt.with_only_columns(
-            *[stmt.selected_columns[c] for c in selects],
+            *[stmt.selected_columns[align_column_case(c)] for c in selects],
             maintain_column_froms=True,  # this keeps derived columns in sa_select using literal_column
         )
     return stmt
@@ -160,15 +160,25 @@ def add_selects(stmt, selects):
 
 def add_orderby(stmt, stmt_all, orderbys):
     for c in orderbys:
+        _c = align_column_case(c)
         # get if last 4 char is 'desc' with case not sensitive
         if c[-5:].lower() == " desc":
-            stmt = stmt.order_by(stmt_all.selected_columns[c[:-4].strip()].desc())
+            stmt = stmt.order_by(stmt_all.selected_columns[_c[:-4].strip()].desc())
 
         elif c[-4:].lower() == " asc":
-            stmt = stmt.order_by(stmt_all.selected_columns[c[:-3].strip()])
+            stmt = stmt.order_by(stmt_all.selected_columns[_c[:-3].strip()])
         else:
-            stmt = stmt.order_by(stmt_all.selected_columns[c])
+            stmt = stmt.order_by(stmt_all.selected_columns[_c])
     return stmt
+
+
+def align_column_case(column_str) -> str:
+    """Align column case to lower case
+
+    Columns are case sensitive in sqlalchemy but bq's columns are.
+    Use lowercase to algin bigquery's column names in their document
+    """
+    return column_str.lower()
 
 
 @cli.command("tables")
@@ -273,15 +283,13 @@ def views(  # noqa: PLR0913
     USE_STANDARD_SQL	STRING	YES if the view was created by using a GoogleSQL query; NO if useLegacySql is set to true
     """
 
-    # These columns are case sensitive in sqlalchemy but bq's columns are.
-    # Use uppercase to algin bigquery's column names in their document
     columns = [
-        Column("TABLE_CATALOG", String),
-        Column("TABLE_SCHEMA", String),
-        Column("TABLE_NAME", String),
-        Column("VIEW_DEFINITION", String),
-        Column("CHECK_OPTION", String),
-        Column("USE_STANDARD_SQL", String),
+        Column("table_catalog", String),
+        Column("table_schema", String),
+        Column("table_name", String),
+        Column("view_definition", String),
+        Column("check_option", String),
+        Column("use_standard_sql", String),
     ]
 
     for c in columns:
@@ -290,7 +298,7 @@ def views(  # noqa: PLR0913
     stmt_all = sa_select(table.c)  # type: ignore[call-overload]
 
     # need to align upper case that is defined above
-    selects = select.upper().split(",") if select else None
+    selects = select.split(",") if select else None
     stmt = add_selects(stmt_all, selects)
     orderby = [c.upper() for c in orderby]
     stmt = add_orderby(stmt, stmt_all, orderby)
