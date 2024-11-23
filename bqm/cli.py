@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 import click
 from sqlalchemy import MetaData, Table, create_engine
 from sqlalchemy.dialects import registry
+from sqlalchemy.engine import Engine
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import Selectable
@@ -21,11 +22,11 @@ warnings.filterwarnings(
 
 
 class Runner:
+    engine: None | Engine
+
     def __init__(self) -> None:
         registry.register("bigquery", "sqlalchemy_bigquery", "BigQueryDialect")
-        self.engine = create_engine(
-            "bigquery://",
-        )
+        self.engine = None
         self.metadata = MetaData()
 
     def get_table(
@@ -42,7 +43,14 @@ class Runner:
         )
         return table
 
-    def select(self, stmt: Selectable, params=None) -> list[dict]:
+    def execute(self, stmt: Selectable, params=None) -> list[dict]:
+        if not self.engine:
+            # creating engine requires authentication to GCP
+            # so, create engine only when it's needed
+            self.engine = create_engine(
+                "bigquery://",
+            )
+
         with Session(self.engine) as session:
             results: list[Row] = session.execute(stmt, params).fetchall()  # type: ignore[call-overload]
             return [r._asdict() for r in results]
@@ -204,7 +212,7 @@ def tables(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.select(stmt, {"timezone": timezone})
+        res = runner.execute(stmt, {"timezone": timezone})
 
         output_result(res, format)
 
@@ -272,6 +280,6 @@ def views(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.select(stmt, {"timezone": timezone})
+        res = runner.execute(stmt, {"timezone": timezone})
 
         output_result(res, format)
