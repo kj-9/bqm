@@ -36,19 +36,13 @@ class Runner:
         project_name: str,
         dataset_name: str,
         table_name: str,
-        auto_load: bool = True,
     ) -> Table:
-        if not self.engine and auto_load:
-            # creating engine requires authentication to GCP
-            # so, create engine only when it's needed
-            self.engine = create_engine(
-                "bigquery://",
-            )
-
+        # we don't do auto_load here because:
+        # 1. INFORMATION_SCHEMA.XYZ views raise error when auto_load due to current implementation of sqlalchemy-bigquery
+        # 2. It requires interaction to BigQuery to get metadata which makes tests harder
         table = Table(
             f"{project_name}.{dataset_name}.{table_name}",
             self.metadata,
-            autoload_with=self.engine if auto_load else None,
         )
         return table
 
@@ -198,7 +192,7 @@ def tables(  # noqa: PLR0913
     # sanitize timezone
     timezone = validate_tz(timezone)
 
-    table = runner.get_table(project, dataset, "__TABLES__", auto_load=False)
+    table = runner.get_table(project, dataset, "__TABLES__")
 
     columns = [
         Column("project_id", String),
@@ -267,9 +261,7 @@ def views(  # noqa: PLR0913
     # auto_load=False to avoid error
     # sqlalchemy-bigquery does not allow to auto_load full table name which contains 3 parts (dots)
     # like `project.dataset.INFORMATION_SCHEMA.VIEWS`
-    table = runner.get_table(
-        project, dataset, "INFORMATION_SCHEMA.VIEWS", auto_load=False
-    )
+    table = runner.get_table(project, dataset, "INFORMATION_SCHEMA.VIEWS")
 
     """INFORMATION_SCHEMA.VIEWS
     ref: https://cloud.google.com/bigquery/docs/information-schema-views#schema
