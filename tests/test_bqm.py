@@ -11,7 +11,7 @@ def test_version():
         assert result.output.startswith("cli, version ")
 
 
-def test_tables_dry_run_fail():
+def test_tables_dryrun(snapshot):
     runner = CliRunner()
 
     with runner.isolated_filesystem():
@@ -33,7 +33,8 @@ def test_tables_dry_run_fail():
             ],
         )
 
-        assert result.exit_code == 1  # need to mock the bq request when using auto_load
+        assert result.exit_code == 0
+        assert result.output == snapshot
 
 
 def test_views_dryrun(snapshot):

@@ -1,4 +1,11 @@
 # serializer version: 1
+# name: test_tables_dryrun
+  '''
+  SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), 'Asia/Tokyo') AS creation_time_tz 
+  FROM "project.dataset.__TABLES__" ORDER BY TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY) DESC, "project.dataset.__TABLES__".size_bytes
+  
+  '''
+# ---
 # name: test_views_dryrun
   '''
   SELECT "project.dataset.INFORMATION_SCHEMA.VIEWS"."TABLE_SCHEMA", "project.dataset.INFORMATION_SCHEMA.VIEWS"."VIEW_DEFINITION" 

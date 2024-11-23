@@ -38,6 +38,13 @@ class Runner:
         table_name: str,
         auto_load: bool = True,
     ) -> Table:
+        if not self.engine and auto_load:
+            # creating engine requires authentication to GCP
+            # so, create engine only when it's needed
+            self.engine = create_engine(
+                "bigquery://",
+            )
+
         table = Table(
             f"{project_name}.{dataset_name}.{table_name}",
             self.metadata,
@@ -181,9 +188,22 @@ def tables(  # noqa: PLR0913
     # sanitize timezone
     timezone = validate_tz(timezone)
 
-    # TODO: may be I should define the table schema in the code not using auto_load
-    # also may be better to align upper case column names as INFORMATION_SCHEMA.VIEWS
-    table = runner.get_table(project, dataset, "__TABLES__")
+    table = runner.get_table(project, dataset, "__TABLES__", auto_load=False)
+
+    columns = [
+        Column("project_id", String),
+        Column("dataset_id", String),
+        Column("table_id", String),
+        Column("creation_time", String),
+        Column("last_modified_time", String),
+        Column("row_count", String),
+        Column("size_bytes", String),
+        Column("type", String),
+    ]
+
+    for c in columns:
+        table.append_column(c)
+
     stmt_all = sa_select(  # type: ignore[call-overload]
         table.c,
         literal_column(
