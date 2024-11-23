@@ -3,7 +3,7 @@ from functools import wraps
 from zoneinfo import ZoneInfo
 
 import click
-from sqlalchemy import MetaData, Table, create_engine
+from sqlalchemy import Column, MetaData, String, Table, create_engine
 from sqlalchemy.dialects import registry
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.row import Row
@@ -238,9 +238,6 @@ def views(  # noqa: PLR0913
     table = runner.get_table(
         project, dataset, "INFORMATION_SCHEMA.VIEWS", auto_load=False
     )
-
-    # add columns
-    from sqlalchemy import Column, String
 
     """INFORMATION_SCHEMA.VIEWS
     ref: https://cloud.google.com/bigquery/docs/information-schema-views#schema
