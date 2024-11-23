@@ -212,7 +212,7 @@ def tables(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.execute(stmt, {"timezone": timezone})
+        res = runner.execute(stmt)
 
         output_result(res, format)
 
@@ -280,6 +280,6 @@ def views(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.execute(stmt, {"timezone": timezone})
+        res = runner.execute(stmt)
 
         output_result(res, format)
