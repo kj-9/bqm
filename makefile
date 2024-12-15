@@ -22,6 +22,10 @@ check:
 test:
 	python -m pytest
 
+.PHONY: update-snapshot
+update-snapshot:
+	python -m pytest --snapshot-update
+
 .PHONY: test-all
 test-all:
 ifndef project

@@ -80,12 +80,14 @@ def query_options(f):
         "--project",
         type=str,
         help="project name",
+        required=True,
     )
     @click.option(
         "-d",
         "--dataset",
         type=str,
         help="dataset name",
+        required=True,
     )
     @click.option(
         "-s",

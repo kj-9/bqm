@@ -1,3 +1,6 @@
+from collections import namedtuple
+
+import pytest
 from click.testing import CliRunner
 
 from bqm.cli import cli
@@ -34,6 +37,41 @@ def test_tables_dryrun(snapshot):
         )
 
         assert result.exit_code == 0
+        assert result.output == snapshot
+
+
+RequiredOptsCase = namedtuple(
+    "RequiredOptsCase",
+    (
+        "description",
+        "subcommand",
+    ),
+)
+
+
+@pytest.mark.parametrize(
+    RequiredOptsCase._fields,
+    (
+        RequiredOptsCase(
+            description="`tables` subcommand",
+            subcommand="tables",
+        ),
+        RequiredOptsCase(
+            description="`views` subcommand",
+            subcommand="views",
+        ),
+    ),
+)
+def test_wo_required_opts(description, subcommand, snapshot):
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        result = runner.invoke(cli, [subcommand, "--project", "project"])
+        assert result.exit_code == 2
+        assert result.output == snapshot
+
+        result = runner.invoke(cli, [subcommand, "--dataset", "dataset"])
+        assert result.exit_code == 2
         assert result.output == snapshot
 
 

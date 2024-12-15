@@ -13,3 +13,39 @@
   
   '''
 # ---
+# name: test_wo_required_opts[`tables` subcommand-tables]
+  '''
+  Usage: cli tables [OPTIONS]
+  Try 'cli tables --help' for help.
+  
+  Error: Missing option '-d' / '--dataset'.
+  
+  '''
+# ---
+# name: test_wo_required_opts[`tables` subcommand-tables].1
+  '''
+  Usage: cli tables [OPTIONS]
+  Try 'cli tables --help' for help.
+  
+  Error: Missing option '-p' / '--project'.
+  
+  '''
+# ---
+# name: test_wo_required_opts[`views` subcommand-views]
+  '''
+  Usage: cli views [OPTIONS]
+  Try 'cli views --help' for help.
+  
+  Error: Missing option '-d' / '--dataset'.
+  
+  '''
+# ---
+# name: test_wo_required_opts[`views` subcommand-views].1
+  '''
+  Usage: cli views [OPTIONS]
+  Try 'cli views --help' for help.
+  
+  Error: Missing option '-p' / '--project'.
+  
+  '''
+# ---
