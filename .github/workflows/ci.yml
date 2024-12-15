@@ -20,10 +20,10 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: |
-          make install
+          just init
       - name: Run tests
         run: |
-          make test
+          just test-unit
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -36,6 +36,7 @@ jobs:
           cache-dependency-path: pyproject.toml
       - name: Install dependencies
         run: |
-          make install
-      - name: Run check
-        run: make check
+          just init
+      - name: Run linter
+        run: |
+          just lint

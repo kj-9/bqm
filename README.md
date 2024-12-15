@@ -55,32 +55,38 @@ cd bqm
 python -m venv venv
 source venv/bin/activate
 ```
-Now install the dependencies and test dependencies:
+
+As a task runner, this project uses [`just`](https://github.com/casey/just?tab=readme-ov-file).
+To install `just` in brew:
 ```bash
-make install-e
+brew install just
+```
+for other installation methods, refer to the just documentation.
+
+
+To install the dependencies:
+```bash
+just init
 ```
 To run the unit tests:
 ```bash
-make test
+just test-unit
+```
+
+You can pass additional arguments to `pytest`:
+```bash
+just test-unit -vv
 ```
 
 Integration tests are skipped by default. To run all tests:
 ```bash
-make test-all project=<project_id>
+just test <project_id>
 ```
 where `<project_id>` is the GCP project id where the tests will be run.
 
 
-To run pre-commit to lint and format:
+To run cog and pre-commit to format:
 ```bash
-make check
+just format
 ```
-
-`make check` detects if cli help message in `README.md` is outdated and updates it.
-
-To update cli help message `README.md`:
-```bash
-make readme
-```
-
-this runs [cog](https://cog.readthedocs.io/en/latest/) on README.md and updates the help message inside it.
+This runs [cog](https://cog.readthedocs.io/en/latest/) on README.md and updates the help message inside it.
