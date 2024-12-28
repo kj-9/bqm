@@ -74,7 +74,9 @@ def cli():
     "Bigquery meta data table utility"
 
 
-def query_options(select_default: str | None = None):
+def query_options(
+    select_default: str | None = None, orderby_default: str | None = None
+):
     def decorator(f):
         @click.option(
             "-p",
@@ -106,7 +108,11 @@ def query_options(select_default: str | None = None):
             "--orderby",
             type=str,
             multiple=True,
-            help="order by columns, if 'column_name desc' to sort descending",
+            help="order by columns, if 'column_name desc' to sort descending"
+            + f"default is '{orderby_default}'"
+            if orderby_default
+            else None,
+            default=orderby_default,
         )
         @click.option(
             "--dryrun",
