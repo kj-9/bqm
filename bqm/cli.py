@@ -239,7 +239,9 @@ def tables(  # noqa: PLR0913
         literal_column(
             "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY)"
         ).label("days_since_last_modification"),
-        literal_column("size_bytes / 1024 / 1024 / 1024").label("size_gb"),
+        literal_column("cast(size_bytes / 1024 / 1024 / 1024 as integer)").label(
+            "size_gb"
+        ),
         literal_column(
             "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END"
         ).label("table_type"),
