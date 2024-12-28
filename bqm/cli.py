@@ -74,57 +74,64 @@ def cli():
     "Bigquery meta data table utility"
 
 
-def query_options(f):
-    @click.option(
-        "-p",
-        "--project",
-        type=str,
-        help="project name",
-        required=True,
-    )
-    @click.option(
-        "-d",
-        "--dataset",
-        type=str,
-        help="dataset name",
-        required=True,
-    )
-    @click.option(
-        "-s",
-        "--select",
-        type=str,
-        help="commna separated column names",
-    )
-    @click.option(
-        # order by column
-        "-o",
-        "--orderby",
-        type=str,
-        multiple=True,
-        help="order by columns, if 'column_name desc' to sort descending",
-    )
-    @click.option(
-        "--dryrun",
-        is_flag=True,
-        help="dry run mode, only show the rendered command",
-    )
-    @click.option(
-        "--format",
-        type=click.Choice(["json", "csv"]),
-        help="output format",
-        default="json",
-    )
-    @click.option(
-        "--timezone",
-        type=str,
-        help="timezone",
-        default="Asia/Tokyo",
-    )
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        return f(*args, **kwargs)
+def query_options(select_default: str | None = None):
+    def decorator(f):
+        @click.option(
+            "-p",
+            "--project",
+            type=str,
+            help="project name",
+            required=True,
+        )
+        @click.option(
+            "-d",
+            "--dataset",
+            type=str,
+            help="dataset name",
+            required=True,
+        )
+        @click.option(
+            "-s",
+            "--select",
+            type=str,
+            help="commna separated column names. set --select '' to select all columns."
+            + " default columns are limited to particularly useful ones to avoid redundancy."
+            if select_default
+            else None,
+            default=select_default,
+        )
+        @click.option(
+            # order by column
+            "-o",
+            "--orderby",
+            type=str,
+            multiple=True,
+            help="order by columns, if 'column_name desc' to sort descending",
+        )
+        @click.option(
+            "--dryrun",
+            is_flag=True,
+            help="dry run mode, only show the rendered command",
+        )
+        @click.option(
+            "--format",
+            type=click.Choice(["json", "csv"]),
+            help="output format",
+            default="json",
+        )
+        @click.option(
+            "--timezone",
+            type=str,
+            help="timezone",
+            default="Asia/Tokyo",
+        )
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            return f(*args, **kwargs)
 
-    return wrapper
+        return wrapper
+
+    return decorator
 
 
 def output_result(res, format):
@@ -178,7 +185,9 @@ def align_column_case(column_str) -> str:
 
 
 @cli.command("tables")
-@query_options
+@query_options(
+    select_default="project_id,dataset_id,table_id,row_count,creation_time_tz,last_modified_time_tz,size_gb"
+)
 def tables(  # noqa: PLR0913
     project: str,
     dataset: str,
@@ -246,7 +255,7 @@ def tables(  # noqa: PLR0913
 
 
 @cli.command("views")
-@query_options
+@query_options()
 def views(  # noqa: PLR0913
     project: str,
     dataset: str,
