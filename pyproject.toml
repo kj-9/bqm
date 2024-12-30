@@ -11,7 +11,8 @@ classifiers = [
 ]
 dependencies = [
     "click",
-    "sqlalchemy-bigquery>=1.12.0"
+    "rich>=13.9.4",
+    "sqlalchemy-bigquery>=1.12.0",
 ]
 
 [build-system]

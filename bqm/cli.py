@@ -46,7 +46,10 @@ class Runner:
         )
         return table
 
-    def execute(self, stmt: Selectable, params=None) -> list[dict]:
+    def execute(
+        self, stmt: Selectable, params=None
+    ) -> tuple[list[Column[str]], list[Row]]:
+        """Execute query and return tuple of column descriptions and rows"""
         if not self.engine:
             # creating engine requires authentication to GCP
             # so, create engine only when it's needed
@@ -55,8 +58,9 @@ class Runner:
             )
 
         with Session(self.engine) as session:
-            results: list[Row] = session.execute(stmt, params).fetchall()  # type: ignore[call-overload]
-            return [r._asdict() for r in results]
+            res = session.execute(stmt, params)  # type: ignore[call-overload]
+
+        return res.cursor.description, res.fetchall()  # type: ignore[assignment]
 
 
 def validate_tz(tz: str) -> str:
@@ -121,9 +125,9 @@ def query_options(
         )
         @click.option(
             "--format",
-            type=click.Choice(["json", "csv"]),
+            type=click.Choice(["table", "json", "csv"]),
             help="output format",
-            default="json",
+            default="table",
         )
         @click.option(
             "--timezone",
@@ -140,22 +144,43 @@ def query_options(
     return decorator
 
 
-def output_result(res, format):
-    if not res:
+def output_result(columns, rows, fmt):
+    if not rows:
         click.echo("No data returned.", err=True)
         return
 
-    if format == "json":
-        import json
+    if fmt == "table":
+        from rich.console import Console
+        from rich.table import Table as RichTable
 
-        click.echo(json.dumps(res, indent=2))
-    elif format == "csv":
+        table = RichTable()
+
+        for c in columns:
+            match c.type_code:
+                case "INTEGER":
+                    table.add_column(c.name, justify="right")
+                case _:
+                    table.add_column(c.name)
+
+        for r in rows:
+            # if numeric (int or float), format with comma
+            table.add_row(*[f"{v:,}" if isinstance(v, (int, float)) else v for v in r])
+
+        console = Console()
+        console.print(table)
+
+    if fmt == "json":
+        from rich import print_json
+
+        print_json(data=[r._asdict() for r in rows])
+
+    elif fmt == "csv":
         import csv
         import sys
 
-        writer = csv.DictWriter(sys.stdout, fieldnames=res[0].keys())
+        writer = csv.DictWriter(sys.stdout, fieldnames=rows[0]._fields)
         writer.writeheader()
-        writer.writerows(res)
+        writer.writerows([r._asdict() for r in rows])
 
 
 def add_selects(stmt, selects):
@@ -257,9 +282,9 @@ def tables(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.execute(stmt)
+        columns, rows = runner.execute(stmt)
 
-        output_result(res, format)
+        output_result(columns, rows, format)
 
 
 @cli.command("views")
@@ -318,6 +343,6 @@ def views(  # noqa: PLR0913
         click.echo(stmt)
 
     else:
-        res = runner.execute(stmt)
+        columns, rows = runner.execute(stmt)
 
-        output_result(res, format)
+        output_result(columns, rows, format)

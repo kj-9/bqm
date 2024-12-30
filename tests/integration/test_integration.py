@@ -45,7 +45,7 @@ def table(bigquery_client, dataset):
     bigquery_client.delete_table(table_id, not_found_ok=True)
 
 
-def test_integration(bigquery_client, table):
+def test_integration(bigquery_client, table, snapshot):
     runner = CliRunner()
     result_json = runner.invoke(
         cli,
@@ -66,22 +66,7 @@ def test_integration(bigquery_client, table):
 
     result = json.loads(result_json.output)
 
-    assert list(result[0].keys()) == [
-        "project_id",
-        "dataset_id",
-        "table_id",
-        "creation_time",
-        "last_modified_time",
-        "row_count",
-        "size_bytes",
-        "type",
-        "creation_time_tz",
-        "days_since_creation",
-        "last_modified_time_tz",
-        "days_since_last_modification",
-        "size_gb",
-        "table_type",
-    ]
+    assert list(result[0].keys()) == snapshot
 
 
 def test_tables_dryrun(project, table, snapshot):

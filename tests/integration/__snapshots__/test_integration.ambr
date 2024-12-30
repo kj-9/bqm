@@ -1,4 +1,15 @@
 # serializer version: 1
+# name: test_integration
+  list([
+    'project_id',
+    'dataset_id',
+    'table_id',
+    'row_count',
+    'creation_time_tz',
+    'last_modified_time_tz',
+    'size_gb',
+  ])
+# ---
 # name: test_tables_dryrun
   '''
   SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), 'Asia/Tokyo') AS creation_time_tz 
