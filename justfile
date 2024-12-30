@@ -1,31 +1,32 @@
+uv_run := "uv run"
 
 # Run tests and pre-commit
-default: format test-unit
+default: fmt test-unit
 
 # Setup project
 init:
-  python -m pip install -e '.[test]'
+  uv sync --extra test
 
 # Run unit tests with supplied options
 test-unit *options:
-  python -m pytest {{options}}
+  {{uv_run}} pytest {{options}}
 
 # Update snapshot of unit tests
 update-snapshot:
-	python -m pytest --snapshot-update
+	{{uv_run}} pytest --snapshot-update
 
 # Run all tests including integration tests
 test PROJECT *options:
-  python -m pytest --integration --project {{PROJECT}} {{options}}
+  {{uv_run}} pytest --integration --project {{PROJECT}} {{options}}
 
 # Rebuild docs with cog
 cog:
-  python -m cogapp -r README.md
+  {{uv_run}} cog -r README.md
 
 # Apply pre-commit checks
-format: cog
-	python -m pre_commit run --all-files --show-diff-on-failure
+fmt: cog
+	{{uv_run}} pre-commit run --all-files --show-diff-on-failure
 
 lint:
-  python -m cogapp --check README.md
-  python -m pre_commit run --all-files --show-diff-on-failure
+  {{uv_run}} cogapp --check README.md
+  {{uv_run}} pre-commit run --all-files --show-diff-on-failure

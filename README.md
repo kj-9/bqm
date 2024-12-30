@@ -9,10 +9,11 @@ Bigquery meta data table utility
 
 ## Installation
 
-Install this tool using `pip`:
+[uv](https://github.com/astral-sh/uv) is recommended to install this tool:
 ```bash
-pip install bqm
+uv tool install git+https://github.com/kj-9/bqm
 ```
+
 ## Usage
 
 For help, run:
@@ -47,27 +48,24 @@ You can also use:
 ```bash
 python -m bqm --help
 ```
+
 ## Development
 
-To contribute to this tool, first checkout the code. Then create a new virtual environment:
+This project uses:
+- [uv](https://github.com/astral-sh/uv) to manage the python virtual environment
+- [just](https://github.com/casey/just) as task runner
+
+To develop this tool, first checkout the code. Then create a new virtual environment:
 ```bash
 cd bqm
-python -m venv venv
-source venv/bin/activate
-```
-
-As a task runner, this project uses [`just`](https://github.com/casey/just?tab=readme-ov-file).
-To install `just` in brew:
-```bash
-brew install just
-```
-for other installation methods, refer to the just documentation.
-
-
-To install the dependencies:
-```bash
 just init
 ```
+
+this installs `bqm` in editable mode:
+```bash
+bqm --help
+```
+
 To run the unit tests:
 ```bash
 just test-unit
@@ -84,9 +82,13 @@ just test <project_id>
 ```
 where `<project_id>` is the GCP project id where the tests will be run.
 
+add `--snapshot-update` to update the snapshots:
+```bash
+just test --snapshot-update
+```
 
 To run cog and pre-commit to format:
 ```bash
-just format
+just fmt
 ```
 This runs [cog](https://cog.readthedocs.io/en/latest/) on README.md and updates the help message inside it.

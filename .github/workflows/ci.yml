@@ -26,6 +26,9 @@ jobs:
         env:
           # this is not required but add it if you get any rate limiting issues
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
       - name: Install dependencies
         run: |
           just init
