@@ -217,7 +217,7 @@ def align_column_case(column_str) -> str:
 
 @cli.command("tables")
 @query_options(
-    select_default="project_id,dataset_id,table_id,row_count,creation_time_tz,last_modified_time_tz,size_gb"
+    select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz"
 )
 def tables(  # noqa: PLR0913
     project: str,
