@@ -28,5 +28,5 @@ fmt: cog
 	{{uv_run}} pre-commit run --all-files --show-diff-on-failure
 
 lint:
-  {{uv_run}} cogapp --check README.md
+  {{uv_run}} cog --check README.md
   {{uv_run}} pre-commit run --all-files --show-diff-on-failure
