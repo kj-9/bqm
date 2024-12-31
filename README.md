@@ -92,3 +92,26 @@ To run cog and pre-commit to format:
 just fmt
 ```
 This runs [cog](https://cog.readthedocs.io/en/latest/) on README.md and updates the help message inside it.
+
+### Debug in VSCode
+
+To debug in VSCode,
+- install the recommended extensions
+- set the python interpreter to the virtual environment created by `uv` (`.venv/bin/python`)
+
+For integration tests, update the project name in `.vscode/settings.json`:
+```bash
+
+```diff
+index 7e19242..1ba076c 100644
+--- a/.vscode/settings.json
++++ b/.vscode/settings.json
+@@ -1,6 +1,6 @@
+ {
+     "python.testing.pytestArgs": [
+-        "tests", "--integration", "--project=<YOUR_PROJECT_NAME_HERE>"
++        "tests", "--integration", "--project=my-gcp-project"
+     ],
+     "python.testing.unittestEnabled": false,
+     "python.testing.pytestEnabled": true
+```
