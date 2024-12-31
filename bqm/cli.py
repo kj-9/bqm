@@ -164,7 +164,7 @@ def output_result(columns, rows, fmt):
 
         for r in rows:
             # if numeric (int or float), format with comma
-            table.add_row(*[f"{v:,}" if isinstance(v, (int, float)) else v for v in r])
+            table.add_row(*[f"{v:,}" if isinstance(v, (int | float)) else v for v in r])
 
         console = Console()
         console.print(table)
