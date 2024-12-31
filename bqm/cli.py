@@ -5,12 +5,12 @@ from functools import wraps
 from zoneinfo import ZoneInfo
 
 import click
-from sqlalchemy import Column, MetaData, String, Table, create_engine
+from sqlalchemy import Column, MetaData, create_engine
 from sqlalchemy.dialects import registry
 from sqlalchemy.engine import Engine
 from sqlalchemy.engine.row import Row
 from sqlalchemy.orm import Session
-from sqlalchemy.sql import Selectable
+from sqlalchemy.sql import Select, Selectable
 from sqlalchemy.sql import select as sa_select
 from sqlalchemy.sql.expression import literal_column
 
@@ -31,21 +31,6 @@ class Runner:
         self.engine = None
         self.metadata = MetaData()
 
-    def get_table(
-        self,
-        project_name: str,
-        dataset_name: str,
-        table_name: str,
-    ) -> Table:
-        # we don't do auto_load here because:
-        # 1. INFORMATION_SCHEMA.XYZ views raise error when auto_load due to current implementation of sqlalchemy-bigquery
-        # 2. It requires interaction to BigQuery to get metadata which makes tests harder
-        table = Table(
-            f"{project_name}.{dataset_name}.{table_name}",
-            self.metadata,
-        )
-        return table
-
     def execute(
         self, stmt: Selectable, params=None
     ) -> tuple[list[Column[str]], list[Row]]:
@@ -58,9 +43,9 @@ class Runner:
             )
 
         with Session(self.engine) as session:
-            res = session.execute(stmt, params)  # type: ignore[call-overload]
+            res = session.execute(stmt, params)
 
-        return res.cursor.description, res.fetchall()  # type: ignore[assignment]
+        return res.cursor.description, res.fetchall()
 
 
 def validate_tz(tz: str) -> str:
@@ -70,12 +55,6 @@ def validate_tz(tz: str) -> str:
         raise click.BadParameter(f"{tz} is not a valid timezone") from e
 
     return tz
-
-
-@click.group()
-@click.version_option()
-def cli():
-    "Bigquery meta data table utility"
 
 
 def query_options(
@@ -144,7 +123,7 @@ def query_options(
     return decorator
 
 
-def output_result(columns, rows, fmt):
+def output_result(columns, rows, fmt) -> None:
     if not rows:
         click.echo("No data returned.", err=True)
         return
@@ -162,9 +141,21 @@ def output_result(columns, rows, fmt):
                 case _:
                     table.add_column(c.name)
 
-        for r in rows:
+        for row in rows:
             # if numeric (int or float), format with comma
-            table.add_row(*[f"{v:,}" if isinstance(v, (int | float)) else v for v in r])
+            import datetime
+
+            parsed_row = []
+            for el in row:
+                match el:
+                    case int() | float():
+                        parsed_row.append(f"{el:,}")
+                    case datetime.datetime():
+                        parsed_row.append(el.isoformat())
+                    case _:
+                        parsed_row.append(el)
+
+            table.add_row(*parsed_row)
 
         console = Console()
         console.print(table)
@@ -183,7 +174,7 @@ def output_result(columns, rows, fmt):
         writer.writerows([r._asdict() for r in rows])
 
 
-def add_selects(stmt, selects):
+def add_selects(stmt: Select, selects: list[str]) -> Select:
     if selects:
         stmt = stmt.with_only_columns(
             *[stmt.selected_columns[align_column_case(c)] for c in selects],
@@ -192,7 +183,7 @@ def add_selects(stmt, selects):
     return stmt
 
 
-def add_orderby(stmt, stmt_all, orderbys):
+def add_orderby(stmt: Select, stmt_all: Select, orderbys) -> Select:
     for c in orderbys:
         _c = align_column_case(c)
         # get if last 4 char is 'desc' with case not sensitive
@@ -215,6 +206,24 @@ def align_column_case(column_str) -> str:
     return column_str.lower()
 
 
+def build_stmt(select: str, orderby: list[str], stmt_all: Select) -> Select:
+    if select:
+        selects = select.split(",")
+        stmt = add_selects(stmt_all, selects)
+
+    if orderby:
+        orderby = [c.upper() for c in orderby]
+        stmt = add_orderby(stmt, stmt_all, orderby)
+
+    return stmt
+
+
+@click.group()
+@click.version_option()
+def cli():
+    "Bigquery meta data table utility"
+
+
 @cli.command("tables")
 @query_options(
     select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz",
@@ -235,21 +244,9 @@ def tables(  # noqa: PLR0913
     # sanitize timezone
     timezone = validate_tz(timezone)
 
-    table = runner.get_table(project, dataset, "__TABLES__")
+    from bqm.schema import TABLES_LEGACY
 
-    columns = [
-        Column("project_id", String),
-        Column("dataset_id", String),
-        Column("table_id", String),
-        Column("creation_time", String),
-        Column("last_modified_time", String),
-        Column("row_count", String),
-        Column("size_bytes", String),
-        Column("type", String),
-    ]
-
-    for c in columns:
-        table.append_column(c)
+    table = TABLES_LEGACY.get_table(project, dataset, runner.metadata)
 
     stmt_all = sa_select(  # type: ignore[call-overload]
         table.c,
@@ -273,11 +270,7 @@ def tables(  # noqa: PLR0913
         ).label("table_type"),
     )
 
-    # select columns
-    selects = select.split(",") if select else None
-    stmt = add_selects(stmt_all, selects)
-    # order by columns
-    stmt = add_orderby(stmt, stmt_all, orderby)
+    stmt = build_stmt(select, orderby, stmt_all)
 
     if dryrun:
         click.echo(stmt)
@@ -285,6 +278,35 @@ def tables(  # noqa: PLR0913
     else:
         columns, rows = runner.execute(stmt)
 
+        output_result(columns, rows, format)
+
+
+@cli.command("tables_v2")
+@query_options()
+def tables_v2(  # noqa: PLR0913
+    project: str,
+    dataset: str,
+    select: str,
+    orderby: list[str],
+    dryrun: bool,
+    format: str,
+    timezone: str,
+):
+    """query INFORMATION_SCHEMA.TABLES"""
+
+    runner = Runner()
+
+    from bqm.schema import TABLES
+
+    tables = TABLES.get_table(project, dataset, runner.metadata)
+
+    stmt = build_stmt(select, orderby, sa_select(tables.c))  # type: ignore[call-overload]
+
+    if dryrun:
+        click.echo(stmt)
+
+    else:
+        columns, rows = runner.execute(stmt)
         output_result(columns, rows, format)
 
 
@@ -301,49 +323,16 @@ def views(  # noqa: PLR0913
 ):
     """query INFORMATION_SCHEMA.VIEWS"""
 
+    from bqm.schema import VIEWS
+
     runner = Runner()
 
-    # auto_load=False to avoid error
-    # sqlalchemy-bigquery does not allow to auto_load full table name which contains 3 parts (dots)
-    # like `project.dataset.INFORMATION_SCHEMA.VIEWS`
-    table = runner.get_table(project, dataset, "INFORMATION_SCHEMA.VIEWS")
+    views = VIEWS.get_table(project, dataset, runner.metadata)
 
-    """INFORMATION_SCHEMA.VIEWS
-    ref: https://cloud.google.com/bigquery/docs/information-schema-views#schema
-
-    columns:
-    TABLE_CATALOG	STRING	The name of the project that contains the dataset
-    TABLE_SCHEMA	STRING	The name of the dataset that contains the view also referred to as the dataset id
-    TABLE_NAME	STRING	The name of the view also referred to as the table id
-    VIEW_DEFINITION	STRING	The SQL query that defines the view
-    CHECK_OPTION	STRING	The value returned is always NULL
-    USE_STANDARD_SQL	STRING	YES if the view was created by using a GoogleSQL query; NO if useLegacySql is set to true
-    """
-
-    columns = [
-        Column("table_catalog", String),
-        Column("table_schema", String),
-        Column("table_name", String),
-        Column("view_definition", String),
-        Column("check_option", String),
-        Column("use_standard_sql", String),
-    ]
-
-    for c in columns:
-        table.append_column(c)
-
-    stmt_all = sa_select(table.c)  # type: ignore[call-overload]
-
-    # need to align upper case that is defined above
-    selects = select.split(",") if select else None
-    stmt = add_selects(stmt_all, selects)
-    orderby = [c.upper() for c in orderby]
-    stmt = add_orderby(stmt, stmt_all, orderby)
+    stmt = build_stmt(select, orderby, sa_select(views.c))  # type: ignore[call-overload]
 
     if dryrun:
         click.echo(stmt)
-
     else:
         columns, rows = runner.execute(stmt)
-
         output_result(columns, rows, format)

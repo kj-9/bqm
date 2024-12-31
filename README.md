@@ -38,8 +38,9 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  tables  query __TABLES__
-  views   query INFORMATION_SCHEMA.VIEWS
+  tables     query __TABLES__
+  tables_v2  query INFORMATION_SCHEMA.TABLES
+  views      query INFORMATION_SCHEMA.VIEWS
 
 ```
 <!-- [[[end]]] -->
