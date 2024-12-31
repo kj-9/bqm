@@ -1,6 +1,6 @@
 {
     "python.testing.pytestArgs": [
-        "tests"
+        "tests", "--integration", "--project=<YOUR_PROJECT_NAME_HERE>"
     ],
     "python.testing.unittestEnabled": false,
     "python.testing.pytestEnabled": true
