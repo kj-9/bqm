@@ -206,7 +206,12 @@ def align_column_case(column_str) -> str:
     return column_str.lower()
 
 
-def build_stmt(select: str, orderby: list[str], stmt_all: Select) -> Select:
+def build_stmt(stmt: Select, select: str | None, orderby: list[str] | None) -> Select:
+    import copy
+
+    # copy stmt to keep original
+    stmt_all = copy.deepcopy(stmt)
+
     if select:
         selects = select.split(",")
         stmt = add_selects(stmt_all, selects)
@@ -270,7 +275,7 @@ def tables(  # noqa: PLR0913
         ).label("table_type"),
     )
 
-    stmt = build_stmt(select, orderby, stmt_all)
+    stmt = build_stmt(stmt_all, select, orderby)
 
     if dryrun:
         click.echo(stmt)
@@ -300,7 +305,7 @@ def tables_v2(  # noqa: PLR0913
 
     tables = TABLES.get_table(project, dataset, runner.metadata)
 
-    stmt = build_stmt(select, orderby, sa_select(tables.c))  # type: ignore[call-overload]
+    stmt = build_stmt(sa_select(tables.c), select, orderby)  # type: ignore[call-overload]
 
     if dryrun:
         click.echo(stmt)
@@ -329,7 +334,7 @@ def views(  # noqa: PLR0913
 
     views = VIEWS.get_table(project, dataset, runner.metadata)
 
-    stmt = build_stmt(select, orderby, sa_select(views.c))  # type: ignore[call-overload]
+    stmt = build_stmt(sa_select(views.c), select, orderby)  # type: ignore[call-overload]
 
     if dryrun:
         click.echo(stmt)
