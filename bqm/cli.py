@@ -79,7 +79,7 @@ def cli():
 
 
 def query_options(
-    select_default: str | None = None, orderby_default: str | None = None
+    select_default: str | None = None, orderby_default: tuple[str, ...] = ()
 ):
     def decorator(f):
         @click.option(
@@ -217,7 +217,8 @@ def align_column_case(column_str) -> str:
 
 @cli.command("tables")
 @query_options(
-    select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz"
+    select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz",
+    orderby_default=("project_id", "dataset_id", "table_id"),
 )
 def tables(  # noqa: PLR0913
     project: str,
