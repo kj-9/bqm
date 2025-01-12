@@ -40,6 +40,7 @@ Options:
 Commands:
   tables     query __TABLES__
   tables_v2  query INFORMATION_SCHEMA.TABLES
+  tui        Open Textual TUI.
   views      query INFORMATION_SCHEMA.VIEWS
 
 ```

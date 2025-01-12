@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy.sql import Select, Selectable
 from sqlalchemy.sql import select as sa_select
 from sqlalchemy.sql.expression import literal_column
+from trogon import tui
 
 # Suppress the specific warning
 warnings.filterwarnings(
@@ -223,6 +224,7 @@ def build_stmt(stmt: Select, select: str | None, orderby: list[str] | None) -> S
     return stmt
 
 
+@tui()
 @click.group()
 @click.version_option()
 def cli():

@@ -13,6 +13,7 @@ dependencies = [
     "click",
     "rich>=13.9.4",
     "sqlalchemy-bigquery>=1.12.0",
+    "trogon>=0.6.0",
 ]
 
 [build-system]
