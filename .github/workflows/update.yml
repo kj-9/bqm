@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write # for creating PR
   pull-requests: write
+  actions: write
 
 jobs:
   update:
