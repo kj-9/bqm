@@ -277,9 +277,7 @@ def tables(  # noqa: PLR0913
 
     stmts = []
     if region:
-        print(region)
         regions = ensure_regions(region)
-        print(regions)
         for r in regions:
             tables = TABLES.get_table(runner.metadata, project, region=r)
 
