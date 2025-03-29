@@ -20,9 +20,25 @@ class PreDefinedTable:
     columns: list[Column]
 
     def get_table(
-        self, project_name: str, dataset_name: str, metadata: MetaData
+        self,
+        metadata: MetaData,
+        project: str,
+        region: str | None = None,
+        dataset: str | None = None,
     ) -> Table:
-        t = Table(f"{project_name}.{dataset_name}.{self.table_name}", metadata)
+        if region and dataset:
+            raise ValueError("region and dataset cannot be both set")
+
+        if not region and not dataset:
+            raise ValueError("region or dataset must be set")
+
+        table_name = self.table_name
+
+        if region:
+            table_name = f"{project}.region-{region}.{self.table_name}"
+        else:
+            table_name = f"{project}.{dataset}.{self.table_name}"
+        t = Table(table_name, metadata)
 
         for c in self.columns:
             t.append_column(c)

@@ -70,11 +70,18 @@ def query_options(
             required=True,
         )
         @click.option(
+            "-r",
+            "--region",
+            type=str,
+            help="comma separated region names. if not set, use default region.",
+            default=None,
+        )
+        @click.option(
             "-d",
             "--dataset",
             type=str,
             help="dataset name",
-            required=True,
+            default=None,
         )
         @click.option(
             "-s",
@@ -292,7 +299,8 @@ def tables(  # noqa: PLR0913
 @query_options()
 def tables_v2(  # noqa: PLR0913
     project: str,
-    dataset: str,
+    region: str | None,
+    dataset: str | None,
     select: str,
     orderby: list[str],
     dryrun: bool,
@@ -305,7 +313,7 @@ def tables_v2(  # noqa: PLR0913
 
     from bqm.schema import TABLES
 
-    tables = TABLES.get_table(project, dataset, runner.metadata)
+    tables = TABLES.get_table(runner.metadata, project, region, dataset)
 
     stmt = build_stmt(sa_select(tables.c), select, orderby)  # type: ignore[call-overload]
 
