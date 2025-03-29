@@ -60,6 +60,25 @@ def validate_tz(tz: str) -> str:
     return tz
 
 
+def ensure_regions(region: str | None) -> set[str]:
+    """Ensure regions are valid"""
+
+    if not region:
+        return BIGQUERY_REGIONS
+
+    regions = set(region.split(","))
+
+    invalid_regions = regions - BIGQUERY_REGIONS
+
+    if invalid_regions:
+        raise click.BadParameter(
+            f"Invalid regions: {', '.join(invalid_regions)}. "
+            f"Valid regions are: {', '.join(BIGQUERY_REGIONS)}"
+        )
+
+    return regions
+
+
 def query_options(
     select_default: str | None = None, orderby_default: tuple[str, ...] = ()
 ):
@@ -240,82 +259,6 @@ def cli():
     "Bigquery meta data table utility"
 
 
-@cli.command("tables_legacy")
-@query_options(
-    select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz",
-    orderby_default=("project_id", "dataset_id", "table_id"),
-)
-def tables_legacy(  # noqa: PLR0913
-    project: str,
-    dataset: str,
-    select: str,
-    orderby: list[str],
-    dryrun: bool,
-    format: str,
-    timezone: str,
-):
-    """query __TABLES__"""
-    runner = Runner()
-
-    # sanitize timezone
-    timezone = validate_tz(timezone)
-
-    from bqm.schema import TABLES_LEGACY
-
-    table = TABLES_LEGACY.get_table(runner.metadata, project, dataset=dataset)
-
-    stmt_all = sa_select(  # type: ignore[call-overload]
-        table.c,
-        literal_column(
-            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), '{timezone}')"
-        ).label("creation_time_tz"),
-        literal_column(
-            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY)"
-        ).label("days_since_creation"),
-        literal_column(
-            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), '{timezone}')"
-        ).label("last_modified_time_tz"),
-        literal_column(
-            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY)"
-        ).label("days_since_last_modification"),
-        literal_column("cast(size_bytes / 1024 / 1024 / 1024 as integer)").label(
-            "size_gb"
-        ),
-        literal_column(
-            "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END"
-        ).label("table_type"),
-    )
-
-    stmt = build_stmt(stmt_all, select, orderby)
-
-    if dryrun:
-        click.echo(stmt)
-
-    else:
-        columns, rows = runner.execute(stmt)
-
-        output_result(columns, rows, format)
-
-
-def ensure_regions(region: str | None) -> set[str]:
-    """Ensure regions are valid"""
-
-    if not region:
-        return BIGQUERY_REGIONS
-
-    regions = set(region.split(","))
-
-    invalid_regions = regions - BIGQUERY_REGIONS
-
-    if invalid_regions:
-        raise click.BadParameter(
-            f"Invalid regions: {', '.join(invalid_regions)}. "
-            f"Valid regions are: {', '.join(BIGQUERY_REGIONS)}"
-        )
-
-    return regions
-
-
 @cli.command("tables")
 @query_options()
 def tables(  # noqa: PLR0913
@@ -405,3 +348,60 @@ def tables(  # noqa: PLR0913
 #         click.echo(stmt)
 #     else:
 #         columns, rows = runner.execute(stmt)
+
+
+@cli.command("tables_legacy")
+@query_options(
+    select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz",
+    orderby_default=("project_id", "dataset_id", "table_id"),
+)
+def tables_legacy(  # noqa: PLR0913
+    project: str,
+    dataset: str,
+    select: str,
+    orderby: list[str],
+    dryrun: bool,
+    format: str,
+    timezone: str,
+):
+    """query __TABLES__"""
+    runner = Runner()
+
+    # sanitize timezone
+    timezone = validate_tz(timezone)
+
+    from bqm.schema import TABLES_LEGACY
+
+    table = TABLES_LEGACY.get_table(runner.metadata, project, dataset=dataset)
+
+    stmt_all = sa_select(  # type: ignore[call-overload]
+        table.c,
+        literal_column(
+            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), '{timezone}')"
+        ).label("creation_time_tz"),
+        literal_column(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY)"
+        ).label("days_since_creation"),
+        literal_column(
+            f"FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(last_modified_time), '{timezone}')"
+        ).label("last_modified_time_tz"),
+        literal_column(
+            "TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(last_modified_time), DAY)"
+        ).label("days_since_last_modification"),
+        literal_column("cast(size_bytes / 1024 / 1024 / 1024 as integer)").label(
+            "size_gb"
+        ),
+        literal_column(
+            "CASE type WHEN 1 THEN 'table' WHEN 2 THEN 'view' ELSE '' END"
+        ).label("table_type"),
+    )
+
+    stmt = build_stmt(stmt_all, select, orderby)
+
+    if dryrun:
+        click.echo(stmt)
+
+    else:
+        columns, rows = runner.execute(stmt)
+
+        output_result(columns, rows, format)
