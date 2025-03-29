@@ -15,6 +15,8 @@ from sqlalchemy.sql import select as sa_select
 from sqlalchemy.sql.expression import literal_column
 from trogon import tui
 
+from bqm.schema import BIGQUERY_REGIONS, TABLES
+
 # Suppress the specific warning
 warnings.filterwarnings(
     "ignore",
@@ -73,7 +75,7 @@ def query_options(
             "-r",
             "--region",
             type=str,
-            help="comma separated region names. if not set, use default region.",
+            help="comma separated region names. if not set, query all regions.",
             default=None,
         )
         @click.option(
@@ -260,7 +262,7 @@ def tables_legacy(  # noqa: PLR0913
 
     from bqm.schema import TABLES_LEGACY
 
-    table = TABLES_LEGACY.get_table(project, dataset, runner.metadata)
+    table = TABLES_LEGACY.get_table(runner.metadata, project, dataset=dataset)
 
     stmt_all = sa_select(  # type: ignore[call-overload]
         table.c,
@@ -295,6 +297,25 @@ def tables_legacy(  # noqa: PLR0913
         output_result(columns, rows, format)
 
 
+def ensure_regions(region: str | None) -> set[str]:
+    """Ensure regions are valid"""
+
+    if not region:
+        return BIGQUERY_REGIONS
+
+    regions = set(region.split(","))
+
+    invalid_regions = regions - BIGQUERY_REGIONS
+
+    if invalid_regions:
+        raise click.BadParameter(
+            f"Invalid regions: {', '.join(invalid_regions)}. "
+            f"Valid regions are: {', '.join(BIGQUERY_REGIONS)}"
+        )
+
+    return regions
+
+
 @cli.command("tables")
 @query_options()
 def tables(  # noqa: PLR0913
@@ -311,18 +332,52 @@ def tables(  # noqa: PLR0913
 
     runner = Runner()
 
-    from bqm.schema import TABLES
+    stmts = []
+    if region:
+        print(region)
+        regions = ensure_regions(region)
+        print(regions)
+        for r in regions:
+            tables = TABLES.get_table(runner.metadata, project, region=r)
 
-    tables = TABLES.get_table(runner.metadata, project, region, dataset)
-
-    stmt = build_stmt(sa_select(tables.c), select, orderby)  # type: ignore[call-overload]
-
-    if dryrun:
-        click.echo(stmt)
+            stmts.append(
+                build_stmt(sa_select(tables.c), select, orderby)  # type: ignore[call-overload]
+            )
 
     else:
-        columns, rows = runner.execute(stmt)
-        output_result(columns, rows, format)
+        tables = TABLES.get_table(runner.metadata, project, dataset=dataset)
+
+        stmts.append(
+            build_stmt(sa_select(tables.c), select, orderby)  # type: ignore[call-overload]
+        )
+
+    if dryrun:
+        click.echo(stmts)
+        return
+
+    # assume stmts are cross regional so we cannot use UNION ALL in one query in BQ.
+    # so, we need to run each query separately and merge the result in python
+
+    # use asyncio and threading to run queries in parallel
+    # bigquery-sqlalchemy does not support async: see: https://github.com/googleapis/python-bigquery-sqlalchemy/issues/1071
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
+
+    def run_query(stmt):
+        return runner.execute(stmt)
+
+    with ThreadPoolExecutor() as executor:
+        loop = asyncio.get_event_loop()
+        tasks = [loop.run_in_executor(executor, run_query, stmt) for stmt in stmts]
+        results = loop.run_until_complete(asyncio.gather(*tasks))
+
+    columns = results[0][0]  # just use first one
+    rows = []
+
+    for result in results:
+        rows.extend(result[1])
+
+    output_result(columns, rows, format)
 
 
 # @cli.command("views")
@@ -350,4 +405,3 @@ def tables(  # noqa: PLR0913
 #         click.echo(stmt)
 #     else:
 #         columns, rows = runner.execute(stmt)
-#         output_result(columns, rows, format)

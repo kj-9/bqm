@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 
 from sqlalchemy import TIMESTAMP, Column, MetaData, String, Table
@@ -40,7 +41,9 @@ class PreDefinedTable:
             table_name = f"{project}.{dataset}.{self.table_name}"
         t = Table(table_name, metadata)
 
-        for c in self.columns:
+        # we need to deepcopy of `Column` to assign multiple times to different tables
+        # otherwise, it will raise error
+        for c in deepcopy(self.columns):
             t.append_column(c)
 
         return t
@@ -98,3 +101,29 @@ VIEWS = PreDefinedTable(
         Column("use_standard_sql", String),
     ],
 )
+
+
+BIGQUERY_REGIONS = {
+    "asia-east1",
+    "asia-east2",
+    "asia-northeast1",
+    "asia-northeast2",
+    "asia-northeast3",
+    "asia-south1",
+    "asia-south2",
+    "asia-southeast1",
+    "asia-southeast2",
+    "australia-southeast1",
+    "europe-west1",
+    "europe-west2",
+    "europe-west3",
+    "europe-west4",
+    "europe-west6",
+    "northamerica-northeast1",
+    "southamerica-east1",
+    "us-central1",
+    "us-east1",
+    "us-east4",
+    "us-west1",
+    "us-west2",
+}
