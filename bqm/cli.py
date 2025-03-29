@@ -238,12 +238,12 @@ def cli():
     "Bigquery meta data table utility"
 
 
-@cli.command("tables")
+@cli.command("tables_legacy")
 @query_options(
     select_default="project_id,dataset_id,table_id,row_count,size_gb,creation_time_tz,last_modified_time_tz",
     orderby_default=("project_id", "dataset_id", "table_id"),
 )
-def tables(  # noqa: PLR0913
+def tables_legacy(  # noqa: PLR0913
     project: str,
     dataset: str,
     select: str,
@@ -295,9 +295,9 @@ def tables(  # noqa: PLR0913
         output_result(columns, rows, format)
 
 
-@cli.command("tables_v2")
+@cli.command("tables")
 @query_options()
-def tables_v2(  # noqa: PLR0913
+def tables(  # noqa: PLR0913
     project: str,
     region: str | None,
     dataset: str | None,
@@ -325,29 +325,29 @@ def tables_v2(  # noqa: PLR0913
         output_result(columns, rows, format)
 
 
-@cli.command("views")
-@query_options()
-def views(  # noqa: PLR0913
-    project: str,
-    dataset: str,
-    select: str,
-    orderby: list[str],
-    dryrun: bool,
-    format: str,
-    timezone: str,
-):
-    """query INFORMATION_SCHEMA.VIEWS"""
+# @cli.command("views")
+# @query_options()
+# def views(  # noqa: PLR0913
+#     project: str,
+#     dataset: str,
+#     select: str,
+#     orderby: list[str],
+#     dryrun: bool,
+#     format: str,
+#     timezone: str,
+# ):
+#     """query INFORMATION_SCHEMA.VIEWS"""
 
-    from bqm.schema import VIEWS
+#     from bqm.schema import VIEWS
 
-    runner = Runner()
+#     runner = Runner()
 
-    views = VIEWS.get_table(project, dataset, runner.metadata)
+#     views = VIEWS.get_table(project, dataset, runner.metadata)
 
-    stmt = build_stmt(sa_select(views.c), select, orderby)  # type: ignore[call-overload]
+#     stmt = build_stmt(sa_select(views.c), select, orderby)  # type: ignore[call-overload]
 
-    if dryrun:
-        click.echo(stmt)
-    else:
-        columns, rows = runner.execute(stmt)
-        output_result(columns, rows, format)
+#     if dryrun:
+#         click.echo(stmt)
+#     else:
+#         columns, rows = runner.execute(stmt)
+#         output_result(columns, rows, format)
