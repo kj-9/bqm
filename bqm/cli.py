@@ -240,6 +240,15 @@ def cli():
     "Bigquery meta data table utility"
 
 
+@cli.command("regions")
+def regions():
+    """Show all supported regions"""
+    from rich.console import Console
+
+    console = Console()
+    console.print(list(BIGQUERY_REGIONS))
+
+
 @cli.command("tables")
 @query_options()
 def tables(  # noqa: PLR0913

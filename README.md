@@ -38,8 +38,9 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  tables  query INFORMATION_SCHEMA.TABLES
-  tui     Open Textual TUI.
+  regions  Show all supported regions
+  tables   query INFORMATION_SCHEMA.TABLES
+  tui      Open Textual TUI.
 
 ```
 <!-- [[[end]]] -->
