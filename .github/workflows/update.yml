@@ -30,6 +30,9 @@ jobs:
     - name: Run copier update
       run: |
         copier update --skip-answered --defaults
+
+        # not committing the worflow file for avoiding permission error (requires PAT)
+        git checkout HEAD -- .github/workflows/update.yml
     - name: Run pre-commit update
       run: |
         pre-commit autoupdate
