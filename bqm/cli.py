@@ -231,6 +231,8 @@ def get_query(project, region=None, dataset=None):
     return f"""
 {select_clause}
 FROM `{project}.{middle_part}.INFORMATION_SCHEMA.TABLES`
+LEFT JOIN `{project}.{middle_part}.INFORMATION_SCHEMA.TABLE_STORAGE`
+  USING(table_catalog, table_schema, table_name, creation_time, table_type)
 """
 
 
