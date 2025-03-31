@@ -1,6 +1,7 @@
 # https://cloud.google.com/bigquery/docs/locations?hl=ja#supported_locations
 BIGQUERY_REGIONS = {
-    "EU" "US",
+    "EU",
+    "US",
     "africa-south1",
     "asia-east1",
     "asia-east2",
