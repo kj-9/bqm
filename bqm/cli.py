@@ -264,7 +264,7 @@ def tables(  # noqa: PLR0913
     format: str,
     timezone: str,
 ):
-    """query INFORMATION_SCHEMA.TABLES"""
+    """Show all tables in the project and their metadata."""
 
     queries = []
 
