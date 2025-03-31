@@ -38,9 +38,8 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  tables         query INFORMATION_SCHEMA.TABLES
-  tables_legacy  query __TABLES__
-  tui            Open Textual TUI.
+  tables  query INFORMATION_SCHEMA.TABLES
+  tui     Open Textual TUI.
 
 ```
 <!-- [[[end]]] -->
