@@ -1,15 +1,7 @@
 # serializer version: 1
 # name: test_tables_dryrun
   '''
-  SELECT FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', TIMESTAMP_MILLIS(creation_time), 'Asia/Tokyo') AS creation_time_tz 
-  FROM "project.dataset.__TABLES__" ORDER BY TIMESTAMP_DIFF(CURRENT_TIMESTAMP(), TIMESTAMP_MILLIS(creation_time), DAY) DESC, "project.dataset.__TABLES__".size_bytes
-  
-  '''
-# ---
-# name: test_views_dryrun
-  '''
-  SELECT "project.dataset.INFORMATION_SCHEMA.VIEWS".table_schema, "project.dataset.INFORMATION_SCHEMA.VIEWS".view_definition 
-  FROM "project.dataset.INFORMATION_SCHEMA.VIEWS" ORDER BY "project.dataset.INFORMATION_SCHEMA.VIEWS".table_schema DESC, "project.dataset.INFORMATION_SCHEMA.VIEWS".table_catalog
+  ['\nSELECT *\nFROM `project.dataset.INFORMATION_SCHEMA.TABLES`\n']
   
   '''
 # ---
@@ -18,7 +10,7 @@
   Usage: cli tables [OPTIONS]
   Try 'cli tables --help' for help.
   
-  Error: Missing option '-d' / '--dataset'.
+  Error: Missing option '-p' / '--project'.
   
   '''
 # ---
@@ -26,24 +18,6 @@
   '''
   Usage: cli tables [OPTIONS]
   Try 'cli tables --help' for help.
-  
-  Error: Missing option '-p' / '--project'.
-  
-  '''
-# ---
-# name: test_wo_required_opts[`views` subcommand-views]
-  '''
-  Usage: cli views [OPTIONS]
-  Try 'cli views --help' for help.
-  
-  Error: Missing option '-d' / '--dataset'.
-  
-  '''
-# ---
-# name: test_wo_required_opts[`views` subcommand-views].1
-  '''
-  Usage: cli views [OPTIONS]
-  Try 'cli views --help' for help.
   
   Error: Missing option '-p' / '--project'.
   

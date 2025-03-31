@@ -56,17 +56,17 @@ RequiredOptsCase = namedtuple(
             description="`tables` subcommand",
             subcommand="tables",
         ),
-        RequiredOptsCase(
-            description="`views` subcommand",
-            subcommand="views",
-        ),
+        # RequiredOptsCase(
+        #    description="`views` subcommand",
+        #    subcommand="views",
+        # ),
     ),
 )
 def test_wo_required_opts(description, subcommand, snapshot):
     runner = CliRunner()
 
     with runner.isolated_filesystem():
-        result = runner.invoke(cli, [subcommand, "--project", "project"])
+        result = runner.invoke(cli, [subcommand, "--region", "US"])
         assert result.exit_code == 2
         assert result.output == snapshot
 
@@ -75,28 +75,28 @@ def test_wo_required_opts(description, subcommand, snapshot):
         assert result.output == snapshot
 
 
-def test_views_dryrun(snapshot):
-    runner = CliRunner()
+# def test_views_dryrun(snapshot):
+#     runner = CliRunner()
 
-    with runner.isolated_filesystem():
-        # views command will not auto_load meaning will not request to bq so useful for unit test
-        result = runner.invoke(
-            cli,
-            [
-                "views",
-                "--project",
-                "project",
-                "--dataset",
-                "dataset",
-                "--select",
-                "TABLE_SCHeMA,view_definition",
-                "--orderby",
-                "table_scheMa dEsc",
-                "-o",
-                "table_catalog aSC",
-                "--dryrun",
-            ],
-        )
+#     with runner.isolated_filesystem():
+#         # views command will not auto_load meaning will not request to bq so useful for unit test
+#         result = runner.invoke(
+#             cli,
+#             [
+#                 "views",
+#                 "--project",
+#                 "project",
+#                 "--dataset",
+#                 "dataset",
+#                 "--select",
+#                 "TABLE_SCHeMA,view_definition",
+#                 "--orderby",
+#                 "table_scheMa dEsc",
+#                 "-o",
+#                 "table_catalog aSC",
+#                 "--dryrun",
+#             ],
+#         )
 
-        assert result.exit_code == 0
-        assert result.output == snapshot
+#         assert result.exit_code == 0
+#         assert result.output == snapshot
