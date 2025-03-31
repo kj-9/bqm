@@ -39,7 +39,7 @@ Options:
 
 Commands:
   regions  Show all supported regions
-  tables   query INFORMATION_SCHEMA.TABLES
+  tables   Show all tables in the project and their metadata.
   tui      Open Textual TUI.
 
 ```
