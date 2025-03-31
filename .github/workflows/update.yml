@@ -41,7 +41,7 @@ jobs:
         committer: github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>
         author: ${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>
         branch: gh-action/update
-        title: Update by `copier update and pre-commit update`
+        title: Update by `copier update` and `pre-commit update`
         body: |
           This PR was created by a GitHub Action triggered by a schedule.
           It runs `copier update` and `pre-commit autoupdate` to keep the project up-to-date.
