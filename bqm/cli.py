@@ -225,12 +225,13 @@ def get_query(project, region=None, dataset=None):
     if region and dataset:
         raise click.BadParameter("region and dataset are mutually exclusive")
 
+    select_clause = "SELECT *" if dataset else f"SELECT '{region}' AS _region, *"
     middle_part = dataset if dataset else f"region-{region}"
 
     return f"""
-    SELECT *
-    FROM `{project}.{middle_part}.INFORMATION_SCHEMA.TABLES`
-    """
+{select_clause}
+FROM `{project}.{middle_part}.INFORMATION_SCHEMA.TABLES`
+"""
 
 
 @tui()
@@ -246,7 +247,7 @@ def regions():
     from rich.console import Console
 
     console = Console()
-    console.print(list(BIGQUERY_REGIONS))
+    console.print(sorted(BIGQUERY_REGIONS))
 
 
 @cli.command("tables")
