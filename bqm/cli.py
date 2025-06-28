@@ -77,8 +77,23 @@ TABLES_DEFAULT_COLUMNS = ",".join(
         "table_type",
         "total_rows",
         "total_logical_bytes",
+        "total_physical_bytes",
+        "active_logical_bytes",
+        "long_term_logical_bytes",
+        "current_physical_bytes",
         "creation_time",
-        "last_modified_time",
+        "storage_last_modified_time",
+    ]
+)
+
+TABLES_DATASET_DEFAULT_COLUMNS = ",".join(
+    [
+        "table_schema",
+        "table_name",
+        "table_type",
+        "creation_time",
+        "ddl",
+        "default_collation_name",
     ]
 )
 
@@ -439,12 +454,19 @@ def get_query(project, region=None, dataset=None, columns: list[str] | None = No
             else f"SELECT '{region}' AS _region, {select_cols}"
         )
 
-    middle_part = dataset if dataset else f"region-{region}"
-
-    return f"""
+    if dataset:
+        from_clause = f"`{project}.{dataset}.INFORMATION_SCHEMA.TABLES`"
+        return f"""
 {select_clause}
-FROM `{project}.{middle_part}.INFORMATION_SCHEMA.TABLES`
-LEFT JOIN `{project}.{middle_part}.INFORMATION_SCHEMA.TABLE_STORAGE`
+FROM {from_clause}
+"""
+    else:
+        from_clause = f"`{project}.region-{region}.INFORMATION_SCHEMA.TABLES`"
+        join_clause = f"`{project}.region-{region}.INFORMATION_SCHEMA.TABLE_STORAGE`"
+        return f"""
+{select_clause}
+FROM {from_clause}
+LEFT JOIN {join_clause}
   USING(table_catalog, table_schema, table_name, creation_time, table_type)
 """
 
@@ -478,11 +500,14 @@ def get_datasets_query(
             else f"SELECT '{region}' AS _region, {select_cols}"
         )
 
-    middle_part = dataset if dataset else f"region-{region}"
+    if dataset:
+        from_clause = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA`"
+    else:
+        from_clause = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA`"
 
     return f"""
 {select_clause}
-FROM `{project}.{middle_part}.INFORMATION_SCHEMA.SCHEMATA`
+FROM {from_clause}
 """
 
 
@@ -516,6 +541,10 @@ def tables(  # noqa: PLR0913
     timezone: str,
 ):
     """Show all tables in the project and their metadata."""
+
+    # Use different default columns when querying by dataset
+    if dataset and select == TABLES_DEFAULT_COLUMNS:
+        select = TABLES_DATASET_DEFAULT_COLUMNS
 
     selects = validate_select(select)
 
