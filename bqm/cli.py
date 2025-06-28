@@ -124,7 +124,7 @@ def query_options(
             "-s",
             "--select",
             type=str,
-            help="commna separated column names. set --select '' to select all columns."
+            help="comma separated column names. set --select '' to select all columns."
             + " default columns are limited to particularly useful ones to avoid redundancy."
             if select_default
             else None,
@@ -136,7 +136,7 @@ def query_options(
             "--orderby",
             type=str,
             multiple=True,
-            help="order by columns, if 'column_name desc' to sort descending"
+            help="order by columns, use 'column_name desc' to sort descending. "
             + f"default is '{orderby_default}'"
             if orderby_default
             else None,
@@ -428,7 +428,7 @@ def tables(  # noqa: PLR0913
 
 @cli.command("datasets")
 @query_options(select_default=DATASETS_DEFAULT_COLUMNS)
-def datasets(  # noqa: PLR0913
+def datasets(  # noqa: PLR0913, PLR0912, PLR0915
     project: str,
     region: str | None,
     dataset: str | None,
@@ -455,11 +455,24 @@ def datasets(  # noqa: PLR0913
             queries.append(get_datasets_query(project, region=r, columns=selects))
 
     if dryrun:
-        click.echo(queries)
+        if verbose:
+            click.echo(f"Generated {len(queries)} queries:")
+            for i, query in enumerate(queries, 1):
+                click.echo(f"Query {i}/{len(queries)}:")
+                click.echo(query.strip())
+                click.echo()
+        else:
+            click.echo(queries)
         return
 
     if verbose:
-        click.echo(queries)
+        click.echo(f"Executing {len(queries)} queries across regions...")
+        for i, query in enumerate(queries, 1):
+            click.echo(f"Query {i}/{len(queries)}:")
+            click.echo(query.strip())
+            click.echo()
+    elif len(queries) > 10:
+        click.echo(f"Querying datasets across {len(queries)} regions...", err=True)
 
     # we cannot use UNION ALL to concat cross-region queries into one query.
     # so we need to run each query separately and merge the result in python
@@ -474,8 +487,22 @@ def datasets(  # noqa: PLR0913
                 return runner.execute_sync(query)
 
             except Exception as e:
-                click.echo(f"Error executing query: {query}", err=True)
-                click.echo(f"Error: {e}", err=True)
+                # Extract region from query for better error context
+                region_match = query.find("region-")
+                if region_match != -1:
+                    region_start = region_match + 7  # len("region-")
+                    region_end = query.find(".", region_start)
+                    region = (
+                        query[region_start:region_end]
+                        if region_end != -1
+                        else "unknown"
+                    )
+                    click.echo(f"Error querying region '{region}': {e}", err=True)
+                else:
+                    click.echo(f"Error querying dataset: {e}", err=True)
+
+                if verbose:
+                    click.echo(f"Failed query: {query}", err=True)
                 return []
 
         # run queries in parallel
@@ -490,7 +517,16 @@ def datasets(  # noqa: PLR0913
         rows.append(dict(row))
 
     if not rows:
-        click.echo("No data returned.", err=True)
+        if dataset:
+            click.echo(
+                f"No datasets found in project '{project}' matching dataset '{dataset}'. Verify the dataset name and your permissions.",
+                err=True,
+            )
+        else:
+            click.echo(
+                f"No datasets found in project '{project}' across {len(queries)} regions. Verify the project name and your permissions.",
+                err=True,
+            )
         return
 
     orderbys = validate_orderby(orderby)
