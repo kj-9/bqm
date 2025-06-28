@@ -471,45 +471,118 @@ def datasets(  # noqa: PLR0913, PLR0912, PLR0915
             click.echo(f"Query {i}/{len(queries)}:")
             click.echo(query.strip())
             click.echo()
-    elif len(queries) > 10:
-        click.echo(f"Querying datasets across {len(queries)} regions...", err=True)
 
     # we cannot use UNION ALL to concat cross-region queries into one query.
     # so we need to run each query separately and merge the result in python
     # use asyncio and threading to run queries in parallel
     runner = Runner()
 
-    with ThreadPoolExecutor() as executor:
-        loop = asyncio.get_event_loop()
+    # Show progress bar for multiple queries
+    show_progress = len(queries) > 1 and not verbose
 
-        def execute_query(query):
-            try:
-                return runner.execute_sync(query)
+    if show_progress:
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+        )
 
-            except Exception as e:
-                # Extract region from query for better error context
-                region_match = query.find("region-")
-                if region_match != -1:
-                    region_start = region_match + 7  # len("region-")
-                    region_end = query.find(".", region_start)
-                    region = (
-                        query[region_start:region_end]
-                        if region_end != -1
-                        else "unknown"
-                    )
-                    click.echo(f"Error querying region '{region}': {e}", err=True)
-                else:
-                    click.echo(f"Error querying dataset: {e}", err=True)
+        progress = Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            MofNCompleteColumn(),
+            transient=True,  # Hide progress bar when done
+        )
 
-                if verbose:
-                    click.echo(f"Failed query: {query}", err=True)
-                return []
+        # Collect errors to display after progress bar
+        errors = []
 
-        # run queries in parallel
-        tasks = [
-            loop.run_in_executor(executor, execute_query, query) for query in queries
-        ]
-        row_iters = loop.run_until_complete(asyncio.gather(*tasks))
+        with progress:
+            task = progress.add_task(
+                f"Querying {len(queries)} regions...", total=len(queries)
+            )
+
+            with ThreadPoolExecutor() as executor:
+                loop = asyncio.get_event_loop()
+
+                def execute_query_with_progress(query):
+                    try:
+                        result = runner.execute_sync(query)
+                        progress.advance(task)
+                        return result
+                    except Exception as e:
+                        progress.advance(task)
+                        # Extract region from query for better error context
+                        region_match = query.find("region-")
+                        if region_match != -1:
+                            region_start = region_match + 7  # len("region-")
+                            region_end = query.find(".", region_start)
+                            region = (
+                                query[region_start:region_end]
+                                if region_end != -1
+                                else "unknown"
+                            )
+                            error_msg = f"Error querying region '{region}': {e}"
+                        else:
+                            error_msg = f"Error querying dataset: {e}"
+
+                        # Store error for later display
+                        error_info = {
+                            "message": error_msg,
+                            "query": query if verbose else None,
+                        }
+                        errors.append(error_info)
+                        return []
+
+                # run queries in parallel
+                tasks = [
+                    loop.run_in_executor(executor, execute_query_with_progress, query)
+                    for query in queries
+                ]
+                row_iters = loop.run_until_complete(asyncio.gather(*tasks))
+
+        # Display errors after progress bar is done
+        for error_info in errors:
+            click.echo(error_info["message"], err=True)
+            if error_info["query"]:
+                click.echo(f"Failed query: {error_info['query']}", err=True)
+    else:
+        # No progress bar for single query or verbose mode
+        with ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+
+            def execute_query(query):
+                try:
+                    return runner.execute_sync(query)
+
+                except Exception as e:
+                    # Extract region from query for better error context
+                    region_match = query.find("region-")
+                    if region_match != -1:
+                        region_start = region_match + 7  # len("region-")
+                        region_end = query.find(".", region_start)
+                        region = (
+                            query[region_start:region_end]
+                            if region_end != -1
+                            else "unknown"
+                        )
+                        click.echo(f"Error querying region '{region}': {e}", err=True)
+                    else:
+                        click.echo(f"Error querying dataset: {e}", err=True)
+
+                    if verbose:
+                        click.echo(f"Failed query: {query}", err=True)
+                    return []
+
+            # run queries in parallel
+            tasks = [
+                loop.run_in_executor(executor, execute_query, query)
+                for query in queries
+            ]
+            row_iters = loop.run_until_complete(asyncio.gather(*tasks))
 
     rows = []
 
