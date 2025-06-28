@@ -69,8 +69,21 @@ def ensure_regions(region: str | None) -> set[str]:
     return regions
 
 
+TABLES_DEFAULT_COLUMNS = (
+    "_region",
+    "table_schema",
+    "table_name",
+    "table_type",
+    "total_rows",
+    "total_logical_bytes",
+    "creation_time",
+    "last_modified_time",
+)
+
+
 def query_options(
-    select_default: str | None = None, orderby_default: tuple[str, ...] = ()
+    select_default: tuple[str, ...] | None = None,
+    orderby_default: tuple[str, ...] = (),
 ):
     def decorator(f):
         @click.option(
@@ -226,11 +239,17 @@ def align_case(column_str) -> str:
     return column_str.lower()
 
 
-def get_query(project, region=None, dataset=None):
+def get_query(project, region=None, dataset=None, columns: list[str] | None = None):
     if region and dataset:
         raise click.BadParameter("region and dataset are mutually exclusive")
 
-    select_clause = "SELECT *" if dataset else f"SELECT '{region}' AS _region, *"
+    select_cols = ", ".join(columns) if columns else "*"
+
+    select_clause = (
+        f"SELECT {select_cols}"
+        if dataset
+        else f"SELECT '{region}' AS _region, {select_cols}"
+    )
     middle_part = dataset if dataset else f"region-{region}"
 
     return f"""
@@ -258,7 +277,7 @@ def regions():
 
 
 @cli.command("tables")
-@query_options()
+@query_options(select_default=TABLES_DEFAULT_COLUMNS)
 def tables(  # noqa: PLR0913
     project: str,
     region: str | None,
@@ -272,16 +291,18 @@ def tables(  # noqa: PLR0913
 ):
     """Show all tables in the project and their metadata."""
 
+    selects = validate_select(select)
+
     queries = []
 
     if dataset:
         # if dataset is set, region is ignored
-        queries.append(get_query(project, dataset=dataset))
+        queries.append(get_query(project, dataset=dataset, columns=selects))
 
     else:
         regions = ensure_regions(region)
         for r in regions:
-            queries.append(get_query(project, region=r))
+            queries.append(get_query(project, region=r, columns=selects))
 
     if dryrun:
         click.echo(queries)
@@ -335,12 +356,5 @@ def tables(  # noqa: PLR0913
     if selects:
         rows = [{col: row[col] for col in selects if col in row.keys()} for row in rows]
 
-        schema_fields = list(
-            filter(
-                lambda f: align_case(f.name) in selects,
-                row_iters[0].schema,
-            )
-        )
-    else:
-        schema_fields = row_iters[0].schema
+    schema_fields = row_iters[0].schema
     output_result(rows, schema_fields, format, timezone)
