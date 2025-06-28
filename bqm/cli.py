@@ -122,6 +122,11 @@ def query_options(
             help="dry run mode, only show the rendered command",
         )
         @click.option(
+            "--verbose",
+            is_flag=True,
+            help="Show the rendered command",
+        )
+        @click.option(
             "--format",
             type=click.Choice(["table", "json", "csv"]),
             help="output format",
@@ -261,6 +266,7 @@ def tables(  # noqa: PLR0913
     select: str,
     orderby: list[str],
     dryrun: bool,
+    verbose: bool,
     format: str,
     timezone: str,
 ):
@@ -280,6 +286,9 @@ def tables(  # noqa: PLR0913
     if dryrun:
         click.echo(queries)
         return
+
+    if verbose:
+        click.echo(queries)
 
     # we cannot use UNION ALL to concat cross-region queries into one query.
     # so we need to run each query separately and merge the result in python
