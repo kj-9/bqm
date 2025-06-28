@@ -38,9 +38,10 @@ Options:
   --help     Show this message and exit.
 
 Commands:
-  regions  Show all supported regions
-  tables   Show all tables in the project and their metadata.
-  tui      Open Textual TUI.
+  datasets  Show all datasets in the project and their metadata.
+  regions   Show all supported regions
+  tables    Show all tables in the project and their metadata.
+  tui       Open Textual TUI.
 
 ```
 <!-- [[[end]]] -->

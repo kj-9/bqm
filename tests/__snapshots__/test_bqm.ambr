@@ -1,7 +1,7 @@
 # serializer version: 1
 # name: test_tables_dryrun
   '''
-  ['\nSELECT *\nFROM `project.dataset.INFORMATION_SCHEMA.TABLES`\nLEFT JOIN `project.dataset.INFORMATION_SCHEMA.TABLE_STORAGE`\n  USING(table_catalog, table_schema, table_name, creation_time, table_type)\n']
+  ['\nSELECT creation_time_tz\nFROM `project.dataset.INFORMATION_SCHEMA.TABLES`\nLEFT JOIN `project.dataset.INFORMATION_SCHEMA.TABLE_STORAGE`\n  USING(table_catalog, table_schema, table_name, creation_time, table_type)\n']
   
   '''
 # ---

@@ -69,20 +69,33 @@ def ensure_regions(region: str | None) -> set[str]:
     return regions
 
 
-TABLES_DEFAULT_COLUMNS = (
-    "_region",
-    "table_schema",
-    "table_name",
-    "table_type",
-    "total_rows",
-    "total_logical_bytes",
-    "creation_time",
-    "last_modified_time",
+TABLES_DEFAULT_COLUMNS = ",".join(
+    [
+        "_region",
+        "table_schema",
+        "table_name",
+        "table_type",
+        "total_rows",
+        "total_logical_bytes",
+        "creation_time",
+        "last_modified_time",
+    ]
+)
+
+DATASETS_DEFAULT_COLUMNS = ",".join(
+    [
+        "_region",
+        "schema_name",
+        "location",
+        "creation_time",
+        "last_modified_time",
+        "default_collation_name",
+    ]
 )
 
 
 def query_options(
-    select_default: tuple[str, ...] | None = None,
+    select_default: tuple[str, ...] | str | None = None,
     orderby_default: tuple[str, ...] = (),
 ):
     def decorator(f):
@@ -243,13 +256,29 @@ def get_query(project, region=None, dataset=None, columns: list[str] | None = No
     if region and dataset:
         raise click.BadParameter("region and dataset are mutually exclusive")
 
-    select_cols = ", ".join(columns) if columns else "*"
+    if columns:
+        if dataset:
+            # When querying a specific dataset, don't add _region prefix
+            # Filter out _region column if it's in the list since it won't exist
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_cols = ", ".join(filtered_columns) if filtered_columns else "*"
+            select_clause = f"SELECT {select_cols}"
+        else:
+            # When querying by region, add _region prefix and filter it from columns
+            filtered_columns = [col for col in columns if col != "_region"]
+            if filtered_columns:
+                select_cols = ", ".join(filtered_columns)
+                select_clause = f"SELECT '{region}' AS _region, {select_cols}"
+            else:
+                select_clause = f"SELECT '{region}' AS _region"
+    else:
+        select_cols = "*"
+        select_clause = (
+            f"SELECT {select_cols}"
+            if dataset
+            else f"SELECT '{region}' AS _region, {select_cols}"
+        )
 
-    select_clause = (
-        f"SELECT {select_cols}"
-        if dataset
-        else f"SELECT '{region}' AS _region, {select_cols}"
-    )
     middle_part = dataset if dataset else f"region-{region}"
 
     return f"""
@@ -257,6 +286,43 @@ def get_query(project, region=None, dataset=None, columns: list[str] | None = No
 FROM `{project}.{middle_part}.INFORMATION_SCHEMA.TABLES`
 LEFT JOIN `{project}.{middle_part}.INFORMATION_SCHEMA.TABLE_STORAGE`
   USING(table_catalog, table_schema, table_name, creation_time, table_type)
+"""
+
+
+def get_datasets_query(
+    project, region=None, dataset=None, columns: list[str] | None = None
+):
+    if region and dataset:
+        raise click.BadParameter("region and dataset are mutually exclusive")
+
+    if columns:
+        if dataset:
+            # When querying a specific dataset, don't add _region prefix
+            # Filter out _region column if it's in the list since it won't exist
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_cols = ", ".join(filtered_columns) if filtered_columns else "*"
+            select_clause = f"SELECT {select_cols}"
+        else:
+            # When querying by region, add _region prefix and filter it from columns
+            filtered_columns = [col for col in columns if col != "_region"]
+            if filtered_columns:
+                select_cols = ", ".join(filtered_columns)
+                select_clause = f"SELECT '{region}' AS _region, {select_cols}"
+            else:
+                select_clause = f"SELECT '{region}' AS _region"
+    else:
+        select_cols = "*"
+        select_clause = (
+            f"SELECT {select_cols}"
+            if dataset
+            else f"SELECT '{region}' AS _region, {select_cols}"
+        )
+
+    middle_part = dataset if dataset else f"region-{region}"
+
+    return f"""
+{select_clause}
+FROM `{project}.{middle_part}.INFORMATION_SCHEMA.SCHEMATA`
 """
 
 
@@ -303,6 +369,90 @@ def tables(  # noqa: PLR0913
         regions = ensure_regions(region)
         for r in regions:
             queries.append(get_query(project, region=r, columns=selects))
+
+    if dryrun:
+        click.echo(queries)
+        return
+
+    if verbose:
+        click.echo(queries)
+
+    # we cannot use UNION ALL to concat cross-region queries into one query.
+    # so we need to run each query separately and merge the result in python
+    # use asyncio and threading to run queries in parallel
+    runner = Runner()
+
+    with ThreadPoolExecutor() as executor:
+        loop = asyncio.get_event_loop()
+
+        def execute_query(query):
+            try:
+                return runner.execute_sync(query)
+
+            except Exception as e:
+                click.echo(f"Error executing query: {query}", err=True)
+                click.echo(f"Error: {e}", err=True)
+                return []
+
+        # run queries in parallel
+        tasks = [
+            loop.run_in_executor(executor, execute_query, query) for query in queries
+        ]
+        row_iters = loop.run_until_complete(asyncio.gather(*tasks))
+
+    rows = []
+
+    for row in itertools.chain(*row_iters):
+        rows.append(dict(row))
+
+    if not rows:
+        click.echo("No data returned.", err=True)
+        return
+
+    orderbys = validate_orderby(orderby)
+
+    for col, order in reversed(orderbys.items()):
+        rows.sort(
+            key=lambda r: r[col],
+            reverse=(order == "desc"),
+        )
+
+    # select columns
+    selects = validate_select(select)
+    if selects:
+        rows = [{col: row[col] for col in selects if col in row.keys()} for row in rows]
+
+    schema_fields = row_iters[0].schema
+    output_result(rows, schema_fields, format, timezone)
+
+
+@cli.command("datasets")
+@query_options(select_default=DATASETS_DEFAULT_COLUMNS)
+def datasets(  # noqa: PLR0913
+    project: str,
+    region: str | None,
+    dataset: str | None,
+    select: str,
+    orderby: list[str],
+    dryrun: bool,
+    verbose: bool,
+    format: str,
+    timezone: str,
+):
+    """Show all datasets in the project and their metadata."""
+
+    selects = validate_select(select)
+
+    queries = []
+
+    if dataset:
+        # if dataset is set, region is ignored
+        queries.append(get_datasets_query(project, dataset=dataset, columns=selects))
+
+    else:
+        regions = ensure_regions(region)
+        for r in regions:
+            queries.append(get_datasets_query(project, region=r, columns=selects))
 
     if dryrun:
         click.echo(queries)
