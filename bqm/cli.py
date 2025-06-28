@@ -400,10 +400,20 @@ def tables(  # noqa: PLR0913
         ]
         row_iters = loop.run_until_complete(asyncio.gather(*tasks))
 
-    rows = []
+    # Extract rows from iterators in parallel to speed up processing
+    def extract_rows(row_iter):
+        return [dict(row) for row in row_iter]
 
-    for row in itertools.chain(*row_iters):
-        rows.append(dict(row))
+    with ThreadPoolExecutor() as executor:
+        loop = asyncio.get_event_loop()
+        extract_tasks = [
+            loop.run_in_executor(executor, extract_rows, row_iter)
+            for row_iter in row_iters
+            if row_iter  # Skip empty results
+        ]
+        row_lists = loop.run_until_complete(asyncio.gather(*extract_tasks))
+
+    rows = list(itertools.chain(*row_lists))
 
     if not rows:
         click.echo("No data returned.", err=True)
@@ -549,6 +559,21 @@ def datasets(  # noqa: PLR0913, PLR0912, PLR0915
             click.echo(error_info["message"], err=True)
             if error_info["query"]:
                 click.echo(f"Failed query: {error_info['query']}", err=True)
+
+        # Extract rows from iterators in parallel to speed up processing
+        def extract_rows(row_iter):
+            return [dict(row) for row in row_iter]
+
+        with ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            extract_tasks = [
+                loop.run_in_executor(executor, extract_rows, row_iter)
+                for row_iter in row_iters
+                if row_iter  # Skip empty results
+            ]
+            row_lists = loop.run_until_complete(asyncio.gather(*extract_tasks))
+
+        rows = list(itertools.chain(*row_lists))
     else:
         # No progress bar for single query or verbose mode
         with ThreadPoolExecutor() as executor:
@@ -584,10 +609,20 @@ def datasets(  # noqa: PLR0913, PLR0912, PLR0915
             ]
             row_iters = loop.run_until_complete(asyncio.gather(*tasks))
 
-    rows = []
+        # Extract rows from iterators in parallel to speed up processing
+        def extract_rows(row_iter):
+            return [dict(row) for row in row_iter]
 
-    for row in itertools.chain(*row_iters):
-        rows.append(dict(row))
+        with ThreadPoolExecutor() as executor:
+            loop = asyncio.get_event_loop()
+            extract_tasks = [
+                loop.run_in_executor(executor, extract_rows, row_iter)
+                for row_iter in row_iters
+                if row_iter  # Skip empty results
+            ]
+            row_lists = loop.run_until_complete(asyncio.gather(*extract_tasks))
+
+        rows = list(itertools.chain(*row_lists))
 
     if not rows:
         if dataset:
