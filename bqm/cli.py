@@ -100,11 +100,13 @@ TABLES_DATASET_DEFAULT_COLUMNS = ",".join(
 DATASETS_DEFAULT_COLUMNS = ",".join(
     [
         "_region",
+        "catalog_name",
         "schema_name",
         "location",
         "creation_time",
         "last_modified_time",
         "default_collation_name",
+        "ddl",
     ]
 )
 
