@@ -42,7 +42,8 @@ select = [
 
 ignore = [
     "E501", # ignore line length violations
-    "PLR2004" # ignore magic values, see also: https://docs.astral.sh/ruff/rules/magic-value-comparison/
+    "PLR2004", # ignore magic values, see also: https://docs.astral.sh/ruff/rules/magic-value-comparison/
+    "PLR0913", # ignore too many arguments
 ]
 
 [tool.ruff.lint.per-file-ignores]
