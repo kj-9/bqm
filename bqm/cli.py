@@ -103,10 +103,12 @@ DATASETS_DEFAULT_COLUMNS = ",".join(
         "catalog_name",
         "schema_name",
         "location",
+        "table_count",
         "creation_time",
         "last_modified_time",
+        "days_old",
+        "days_since_modified",
         "default_collation_name",
-        "ddl",
     ]
 )
 
@@ -473,43 +475,169 @@ LEFT JOIN {join_clause}
 """
 
 
+def _build_dataset_select_clause(  # noqa: PLR0912
+    columns, region, dataset, computed_columns, base_columns
+):
+    """Build the SELECT clause for dataset queries."""
+    if columns:
+        if dataset:
+            # When querying a specific dataset, don't add _region prefix
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_items = []
+            for col in filtered_columns:
+                if col in computed_columns:
+                    select_items.append(computed_columns[col])
+                elif col in base_columns:
+                    select_items.append(f"{base_columns[col]} AS {col}")
+                else:
+                    select_items.append(f"s.{col}")
+            return f"SELECT {', '.join(select_items)}" if select_items else "SELECT *"
+        else:
+            # When querying by region, add _region prefix
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_items = [f"'{region}' AS _region"]
+            for col in filtered_columns:
+                if col in computed_columns:
+                    select_items.append(computed_columns[col])
+                elif col in base_columns:
+                    select_items.append(f"{base_columns[col]} AS {col}")
+                else:
+                    select_items.append(f"s.{col}")
+            return (
+                f"SELECT {', '.join(select_items)}"
+                if len(select_items) > 1
+                else f"SELECT '{region}' AS _region"
+            )
+    else:
+        # Select all columns with computed ones
+        all_select_items = []
+        if not dataset:
+            all_select_items.append(f"'{region}' AS _region")
+
+        # Add base columns
+        for col, mapping in base_columns.items():
+            all_select_items.append(f"{mapping} AS {col}")
+
+        # Add computed columns
+        for _col, mapping in computed_columns.items():
+            all_select_items.append(mapping)
+
+        return f"SELECT {', '.join(all_select_items)}"
+
+
 def get_datasets_query(
     project, region=None, dataset=None, columns: list[str] | None = None
 ):
     if region and dataset:
         raise click.BadParameter("region and dataset are mutually exclusive")
 
-    if columns:
-        if dataset:
-            # When querying a specific dataset, don't add _region prefix
-            # Filter out _region column if it's in the list since it won't exist
-            filtered_columns = [col for col in columns if col != "_region"]
-            select_cols = ", ".join(filtered_columns) if filtered_columns else "*"
-            select_clause = f"SELECT {select_cols}"
-        else:
-            # When querying by region, add _region prefix and filter it from columns
-            filtered_columns = [col for col in columns if col != "_region"]
-            if filtered_columns:
-                select_cols = ", ".join(filtered_columns)
-                select_clause = f"SELECT '{region}' AS _region, {select_cols}"
-            else:
-                select_clause = f"SELECT '{region}' AS _region"
-    else:
-        select_cols = "*"
-        select_clause = (
-            f"SELECT {select_cols}"
-            if dataset
-            else f"SELECT '{region}' AS _region, {select_cols}"
-        )
+    # Define computed columns
+    computed_columns = {
+        "table_count": "COALESCE(tc.table_count, 0) AS table_count",
+        "days_old": "DATE_DIFF(CURRENT_DATE(), DATE(s.creation_time), DAY) AS days_old",
+        "days_since_modified": "DATE_DIFF(CURRENT_DATE(), DATE(s.last_modified_time), DAY) AS days_since_modified",
+    }
 
+    # Define column mappings (with table alias)
+    base_columns = {
+        "catalog_name": "s.catalog_name",
+        "schema_name": "s.schema_name",
+        "location": "s.location",
+        "creation_time": "s.creation_time",
+        "last_modified_time": "s.last_modified_time",
+        "default_collation_name": "s.default_collation_name",
+        "ddl": "s.ddl",
+        "schema_owner": "s.schema_owner",
+    }
+
+    select_clause = _build_dataset_select_clause(
+        columns, region, dataset, computed_columns, base_columns
+    )
+
+    # Base table and join for table counts
     if dataset:
-        from_clause = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA`"
+        schemata_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA`"
+        tables_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.TABLES`"
     else:
-        from_clause = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA`"
+        schemata_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA`"
+        tables_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.TABLES`"
 
     return f"""
 {select_clause}
-FROM {from_clause}
+FROM {schemata_table} s
+LEFT JOIN (
+  SELECT
+    table_schema,
+    COUNT(*) as table_count
+  FROM {tables_table}
+  GROUP BY table_schema
+) tc ON s.schema_name = tc.table_schema
+"""
+
+
+def get_datasets_options_query(  # noqa: PLR0912
+    project, region=None, dataset=None, columns: list[str] | None = None
+):
+    """Get query for dataset options from SCHEMATA_OPTIONS table."""
+    if region and dataset:
+        raise click.BadParameter("region and dataset are mutually exclusive")
+
+    # Define column mappings
+    option_columns = {
+        "catalog_name": "so.catalog_name",
+        "schema_name": "so.schema_name",
+        "option_name": "so.option_name",
+        "option_type": "so.option_type",
+        "option_value": "so.option_value",
+    }
+
+    if columns:
+        if dataset:
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_items = []
+            for col in filtered_columns:
+                if col in option_columns:
+                    select_items.append(f"{option_columns[col]} AS {col}")
+                else:
+                    select_items.append(f"so.{col}")
+            select_clause = (
+                f"SELECT {', '.join(select_items)}" if select_items else "SELECT *"
+            )
+        else:
+            filtered_columns = [col for col in columns if col != "_region"]
+            select_items = [f"'{region}' AS _region"]
+            for col in filtered_columns:
+                if col in option_columns:
+                    select_items.append(f"{option_columns[col]} AS {col}")
+                else:
+                    select_items.append(f"so.{col}")
+            select_clause = (
+                f"SELECT {', '.join(select_items)}"
+                if len(select_items) > 1
+                else f"SELECT '{region}' AS _region"
+            )
+    else:
+        # Select all columns
+        all_select_items = []
+        if not dataset:
+            all_select_items.append(f"'{region}' AS _region")
+
+        for col, mapping in option_columns.items():
+            all_select_items.append(f"{mapping} AS {col}")
+
+        select_clause = f"SELECT {', '.join(all_select_items)}"
+
+    # Base table
+    if dataset:
+        options_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`"
+    else:
+        options_table = (
+            f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`"
+        )
+
+    return f"""
+{select_clause}
+FROM {options_table} so
 """
 
 
@@ -585,7 +713,12 @@ def tables(  # noqa: PLR0913
 
 @cli.command("datasets")
 @query_options(select_default=DATASETS_DEFAULT_COLUMNS)
-def datasets(  # noqa: PLR0913
+@click.option(
+    "--show-options",
+    is_flag=True,
+    help="Include dataset configuration options from SCHEMATA_OPTIONS",
+)
+def datasets(  # noqa: PLR0913, PLR0912
     project: str,
     region: str | None,
     dataset: str | None,
@@ -595,6 +728,7 @@ def datasets(  # noqa: PLR0913
     verbose: bool,
     format: str,
     timezone: str,
+    show_options: bool,
 ):
     """Show all datasets in the project and their metadata."""
 
@@ -602,7 +736,36 @@ def datasets(  # noqa: PLR0913
 
     queries = []
 
-    if dataset:
+    if show_options:
+        # Query dataset options instead of regular datasets
+        option_columns = (
+            [
+                "_region",
+                "catalog_name",
+                "schema_name",
+                "option_name",
+                "option_type",
+                "option_value",
+            ]
+            if not selects
+            else selects
+        )
+        if dataset:
+            queries.append(
+                get_datasets_options_query(
+                    project, dataset=dataset, columns=option_columns
+                )
+            )
+        else:
+            regions = ensure_regions(region)
+            for r in regions:
+                queries.append(
+                    get_datasets_options_query(
+                        project, region=r, columns=option_columns
+                    )
+                )
+    # Regular dataset query
+    elif dataset:
         # if dataset is set, region is ignored
         queries.append(get_datasets_query(project, dataset=dataset, columns=selects))
     else:
