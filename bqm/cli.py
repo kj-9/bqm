@@ -528,8 +528,8 @@ def _build_dataset_select_clause(  # noqa: PLR0912
 def get_datasets_query(
     project, region=None, dataset=None, columns: list[str] | None = None
 ):
-    if region and dataset:
-        raise click.BadParameter("region and dataset are mutually exclusive")
+    # Note: dataset parameter is kept for compatibility but not used in query construction
+    # Filtering by dataset is done after query execution
 
     # Define computed columns
     computed_columns = {
@@ -551,16 +551,16 @@ def get_datasets_query(
     }
 
     select_clause = _build_dataset_select_clause(
-        columns, region, dataset, computed_columns, base_columns
+        columns,
+        region,
+        False,
+        computed_columns,
+        base_columns,  # Always pass False for dataset
     )
 
-    # Base table and join for table counts
-    if dataset:
-        schemata_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA`"
-        tables_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.TABLES`"
-    else:
-        schemata_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA`"
-        tables_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.TABLES`"
+    # Base table and join for table counts (always use region-based query)
+    schemata_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA`"
+    tables_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.TABLES`"
 
     return f"""
 {select_clause}
@@ -579,8 +579,8 @@ def get_datasets_options_query(  # noqa: PLR0912
     project, region=None, dataset=None, columns: list[str] | None = None
 ):
     """Get query for dataset options from SCHEMATA_OPTIONS table."""
-    if region and dataset:
-        raise click.BadParameter("region and dataset are mutually exclusive")
+    # Note: dataset parameter is kept for compatibility but not used in query construction
+    # Filtering by dataset is done after query execution
 
     # Define column mappings
     option_columns = {
@@ -592,48 +592,28 @@ def get_datasets_options_query(  # noqa: PLR0912
     }
 
     if columns:
-        if dataset:
-            filtered_columns = [col for col in columns if col != "_region"]
-            select_items = []
-            for col in filtered_columns:
-                if col in option_columns:
-                    select_items.append(f"{option_columns[col]} AS {col}")
-                else:
-                    select_items.append(f"so.{col}")
-            select_clause = (
-                f"SELECT {', '.join(select_items)}" if select_items else "SELECT *"
-            )
-        else:
-            filtered_columns = [col for col in columns if col != "_region"]
-            select_items = [f"'{region}' AS _region"]
-            for col in filtered_columns:
-                if col in option_columns:
-                    select_items.append(f"{option_columns[col]} AS {col}")
-                else:
-                    select_items.append(f"so.{col}")
-            select_clause = (
-                f"SELECT {', '.join(select_items)}"
-                if len(select_items) > 1
-                else f"SELECT '{region}' AS _region"
-            )
+        # Always use region-based query (not dataset-specific)
+        filtered_columns = [col for col in columns if col != "_region"]
+        select_items = [f"'{region}' AS _region"]
+        for col in filtered_columns:
+            if col in option_columns:
+                select_items.append(f"{option_columns[col]} AS {col}")
+            else:
+                select_items.append(f"so.{col}")
+        select_clause = (
+            f"SELECT {', '.join(select_items)}"
+            if len(select_items) > 1
+            else f"SELECT '{region}' AS _region"
+        )
     else:
         # Select all columns
-        all_select_items = []
-        if not dataset:
-            all_select_items.append(f"'{region}' AS _region")
-
+        all_select_items = [f"'{region}' AS _region"]
         for col, mapping in option_columns.items():
             all_select_items.append(f"{mapping} AS {col}")
-
         select_clause = f"SELECT {', '.join(all_select_items)}"
 
-    # Base table
-    if dataset:
-        options_table = f"`{project}.{dataset}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`"
-    else:
-        options_table = (
-            f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`"
-        )
+    # Base table (always use region-based query)
+    options_table = f"`{project}.region-{region}.INFORMATION_SCHEMA.SCHEMATA_OPTIONS`"
 
     return f"""
 {select_clause}
@@ -751,11 +731,14 @@ def datasets(  # noqa: PLR0913, PLR0912
             else selects
         )
         if dataset:
-            queries.append(
-                get_datasets_options_query(
-                    project, dataset=dataset, columns=option_columns
+            # When querying a specific dataset with options, search across all regions
+            regions = ensure_regions(None)  # Get all regions
+            for r in regions:
+                queries.append(
+                    get_datasets_options_query(
+                        project, region=r, columns=option_columns
+                    )
                 )
-            )
         else:
             regions = ensure_regions(region)
             for r in regions:
@@ -766,8 +749,10 @@ def datasets(  # noqa: PLR0913, PLR0912
                 )
     # Regular dataset query
     elif dataset:
-        # if dataset is set, region is ignored
-        queries.append(get_datasets_query(project, dataset=dataset, columns=selects))
+        # When querying a specific dataset, search across all regions
+        regions = ensure_regions(None)  # Get all regions
+        for r in regions:
+            queries.append(get_datasets_query(project, region=r, columns=selects))
     else:
         regions = ensure_regions(region)
         for r in regions:
@@ -788,6 +773,10 @@ def datasets(  # noqa: PLR0913, PLR0912
     rows, schema_fields = execute_metadata_query(
         queries, runner, orderby, select, verbose
     )
+
+    # Filter results if a specific dataset was requested
+    if dataset and rows:
+        rows = [row for row in rows if row.get("schema_name") == dataset]
 
     if not rows:
         if dataset:
